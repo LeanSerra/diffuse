@@ -1,0 +1,540 @@
+/* diffuse — "the terminal, expanded".
+   Structural chrome is grey by rule: the only saturated colour on the page is
+   the diff itself. Amber is the one accent, chosen because it sits far from
+   red and green and can never be mistaken for diff semantics. */
+
+:root {
+  --ground: #fcfcfd;
+  --panel: #f3f4f7;
+  --raised: #ffffff;
+  --rule: #e2e4ea;
+  --rule-strong: #cbd0da;
+  --ink: #171a21;
+  --ink-mid: #5a616e;
+  --ink-dim: #878e9d;
+  --accent: #b26a00;
+  --accent-soft: #fff3dc;
+
+  --add-bg: #e7f6ec;
+  --add-word: #a8e3bd;
+  --add-mark: #0f7a44;
+  --add-gutter: #cdebd8;
+  --del-bg: #fdeced;
+  --del-word: #f8bfc3;
+  --del-mark: #c02434;
+  --del-gutter: #f6ced2;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo,
+    Consolas, "DejaVu Sans Mono", monospace;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --row: 20px;
+  --gutter: 52px;
+  --sidebar: 320px;
+  --bar: 44px;
+}
+
+/* Dark tokens are declared twice on purpose: once for the system
+   preference, once for an explicit override, so neither wins by accident. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+--ground: #12141a;
+--panel: #171a21;
+--raised: #1b1f28;
+--rule: #262b36;
+--rule-strong: #39404f;
+--ink: #e6e9ef;
+--ink-mid: #9aa2b1;
+--ink-dim: #6c7484;
+--accent: #e9a13b;
+--accent-soft: #2e2313;
+--add-bg: #122a1c;
+--add-word: #1e5c38;
+--add-mark: #58c98a;
+--add-gutter: #1b3d28;
+--del-bg: #2d1518;
+--del-word: #6b232c;
+--del-mark: #f0737f;
+--del-gutter: #421d22;
+  }
+}
+
+:root[data-theme="dark"] {
+--ground: #12141a;
+--panel: #171a21;
+--raised: #1b1f28;
+--rule: #262b36;
+--rule-strong: #39404f;
+--ink: #e6e9ef;
+--ink-mid: #9aa2b1;
+--ink-dim: #6c7484;
+--accent: #e9a13b;
+--accent-soft: #2e2313;
+--add-bg: #122a1c;
+--add-word: #1e5c38;
+--add-mark: #58c98a;
+--add-gutter: #1b3d28;
+--del-bg: #2d1518;
+--del-word: #6b232c;
+--del-mark: #f0737f;
+--del-gutter: #421d22;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- shell ---------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-rows: var(--bar) 1fr;
+  grid-template-columns: var(--sidebar) 1fr;
+  grid-template-areas: "bar bar" "side main";
+  height: 100%;
+}
+
+.shell[data-side="off"] {
+  grid-template-columns: 1fr;
+  grid-template-areas: "bar" "main";
+}
+
+/* ---------- command bar ---------------------------------------------- */
+
+.bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* A shell prompt: diffuse@<repo>$ followed by the command it ran. */
+.prompt {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.prompt .who { color: var(--ink); }
+.prompt .where { color: var(--accent); }
+.prompt .punct { color: var(--ink-dim); font-weight: 400; }
+
+/* The literal command, so you always know what you are reading. */
+.command {
+  font-family: var(--mono);
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.command b { color: var(--ink); font-weight: 600; }
+
+.bar-stats { display: flex; align-items: center; gap: 10px; font-family: var(--mono); }
+.bar-stats .files { color: var(--ink-dim); }
+
+/* The file list is a panel you can put away; the toggle keeps its count so the
+   bar still tells you how many files changed when the list is hidden. */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-family: var(--mono);
+  color: var(--ink-mid);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 7px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.toggle svg { display: block; }
+.toggle-count { font-size: 11px; }
+.toggle:hover { color: var(--ink); border-color: var(--rule-strong); }
+.toggle[aria-pressed="true"] { color: var(--ink); }
+
+.refresh {
+  font: inherit;
+  font-family: var(--mono);
+  color: var(--ink-mid);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.refresh:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+.add-count { color: var(--add-mark); }
+.del-count { color: var(--del-mark); }
+
+/* ---------- sidebar --------------------------------------------------- */
+
+.side {
+  grid-area: side;
+  border-right: 1px solid var(--rule);
+  background: var(--panel);
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+.side-head {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  padding: 12px 14px 8px;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--rule);
+}
+
+.file-link {
+  display: grid;
+  /* minmax(0, 1fr), not 1fr: a bare `1fr` track refuses to shrink below its
+     content's minimum width, so one very long file name pushes the counts out
+     of the panel instead of being truncated. */
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 5px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.file-link:hover { background: var(--raised); }
+.file-link[aria-current="true"] {
+  border-left-color: var(--accent);
+  background: var(--raised);
+  color: var(--ink);
+}
+/* Name over directory, on two lines. Sharing one line means a long path and a
+   long file name compete for the same pixels, and whichever loses ends up as an
+   unreadable one-character stub jammed against the other. Stacked, each gets
+   the full width and truncates on its own terms. */
+.file-link .name { display: block; min-width: 0; }
+.file-link .base,
+.file-link .dir {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.file-link .base { color: inherit; font-weight: 600; }
+.file-link .dir {
+  color: var(--ink-dim);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+.file-link .counts { font-size: 11px; white-space: nowrap; }
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink-dim);
+}
+.badge[data-s="added"], .badge[data-s="untracked"] { color: var(--add-mark); }
+.badge[data-s="deleted"] { color: var(--del-mark); }
+.badge[data-s="renamed"], .badge[data-s="copied"] { color: var(--accent); }
+
+/* ---------- main scroller --------------------------------------------- */
+
+/* No `scroll-behavior: smooth`: it applies to programmatic scrolls too, and
+   would animate against the per-frame realignment that holds a jump on its
+   target while files load. */
+.main { grid-area: main; overflow-y: auto; }
+
+/* No gap between cards. A sticky header can only stay while its own card is on
+   screen, so any space between cards is a window where the previous header has
+   already been pushed off and the next has not yet reached the top — and the
+   diff shows through at the top edge. Flush cards hand off with no such window. */
+.stack { padding: 14px; display: flex; flex-direction: column; gap: 0; }
+
+.card {
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: 0;
+  background: var(--raised);
+  /* `clip`, not `hidden`. Both round the corners, but `hidden` creates a
+     scroll container, which would make the card the sticky header's scrollport
+     and stop it pinning to the top of the page. `clip` does not, so the header
+     still pins *and* rows are clipped at the card's rounded corners instead of
+     showing through the notch above the header. */
+  overflow: clip;
+}
+.card:first-child { border-radius: 6px 6px 0 0; }
+.card:last-child {
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0 0 6px 6px;
+}
+.card:target, .card[data-current="true"] { border-color: var(--rule-strong); }
+
+.card-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  /* Give the header its own compositor layer. Repainting a sticky bar every
+     frame over a very long document lets the diff underneath show through it
+     mid-scroll; a promoted layer is composited instead of repainted. */
+  will-change: transform;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+/* The name shrinks to its content so the copy button sits beside the file name
+   rather than drifting to the far edge of the header. */
+.card-head .named {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.card-head .path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-head .head-gap { flex: 1 1 auto; }
+
+.copy {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.copy:hover { color: var(--ink); background: var(--rule); }
+.copy[data-done="true"] { color: var(--add-mark); }
+.card-head .dir { color: var(--ink-dim); }
+.card-head .base { font-weight: 700; }
+.card-head .from { color: var(--ink-dim); }
+
+.chip {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.collapse {
+  font: inherit;
+  font-family: var(--mono);
+  background: transparent;
+  border: 0;
+  color: var(--ink-dim);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.collapse:hover { color: var(--ink); }
+
+/* ---------- diff body -------------------------------------------------- */
+
+.body {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: var(--row);
+}
+
+.hunk-head {
+  display: grid;
+  grid-template-columns: var(--gutter) 1fr;
+  background: var(--panel);
+  color: var(--ink-dim);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.hunk-head .nums { text-align: center; border-right: 1px solid var(--rule); }
+.hunk-head .section { padding-left: 10px; color: var(--ink-mid); white-space: pre; overflow: hidden; }
+
+.row { display: grid; grid-template-columns: 26px 26px 1fr; }
+.row .n {
+  text-align: right;
+  padding-right: 6px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  user-select: none;
+  background: var(--panel);
+  border-right: 1px solid var(--rule);
+}
+.row .c {
+  padding-left: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 4;
+}
+.row .c::before {
+  content: attr(data-sigil);
+  display: inline-block;
+  width: 1ch;
+  margin-left: -1ch;
+  color: var(--ink-dim);
+}
+
+.row[data-k="add"] { background: var(--add-bg); }
+.row[data-k="add"] .n { background: var(--add-gutter); color: var(--add-mark); }
+.row[data-k="add"] .c::before { color: var(--add-mark); }
+.row[data-k="del"] { background: var(--del-bg); }
+.row[data-k="del"] .n { background: var(--del-gutter); color: var(--del-mark); }
+.row[data-k="del"] .c::before { color: var(--del-mark); }
+
+.row mark {
+  background: var(--add-word);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.row[data-k="del"] mark { background: var(--del-word); }
+
+.eof {
+  display: block;
+  color: var(--ink-dim);
+  font-style: italic;
+  padding-left: 10px;
+}
+
+/* ---------- states ------------------------------------------------------ */
+
+.note {
+  padding: 20px;
+  color: var(--ink-mid);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.note button {
+  font: inherit;
+  margin-top: 10px;
+  display: block;
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.note button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Height is set inline from the file's line counts, so the document length is
+   roughly right before anything has loaded. */
+.skeleton { background: var(--panel); }
+
+.empty {
+  margin: 12vh auto 0;
+  max-width: 44ch;
+  text-align: center;
+  color: var(--ink-mid);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.empty .mark {
+  display: block;
+  font-size: 26px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.empty code { color: var(--ink); }
+
+.error {
+  margin: 10vh auto 0;
+  max-width: 70ch;
+  padding: 16px 18px;
+  border: 1px solid var(--del-word);
+  border-left: 3px solid var(--del-mark);
+  border-radius: 4px;
+  background: var(--del-bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+.commit {
+  margin: 14px 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--raised);
+}
+.commit h1 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+.commit .meta { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.merge-note {
+  margin: 8px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.commit pre {
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  white-space: pre-wrap;
+}
+
+.keys {
+  padding: 10px 14px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+}
+.keys kbd {
+  font: inherit;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-right: 2px;
+  color: var(--ink-mid);
+}
+
+/* Narrow the file list on small screens rather than hiding it. Forcing it off
+   overrode the toggle, so there was no way to get it back. */
+@media (max-width: 860px) {
+  :root { --sidebar: 232px; }
+}
+
+@media (max-width: 620px) {
+  :root { --sidebar: 190px; }
+  .file-link { padding: 5px 10px; }
+  .side-head { padding: 12px 10px 8px; }
+}

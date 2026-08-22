@@ -1,0 +1,8 @@
+---
+source: tests/words.rs
+expression: "render(&patch(\"-fn run(a, c)\\n+fn run(a, b, c)\\n\"))"
+---
+-fn run(a, c)
+
++fn run(a, b, c)
+          ~~~

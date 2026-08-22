@@ -1,0 +1,8 @@
+---
+source: tests/words.rs
+expression: "render(&patch(\"-let total = price * quantity;\\n+let total = price * qty;\\n\"))"
+---
+-let total = price * quantity;
+                    ~~~~~~~~
++let total = price * qty;
+                    ~~~

@@ -1,0 +1,8 @@
+---
+source: tests/words.rs
+expression: rendered
+---
+-x 🎉 alpha
+     ~~~~~
++x 🎉 bravo
+     ~~~~~

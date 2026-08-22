@@ -1,0 +1,57 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "café.txt",
+    "hunks": [
+      {
+        "header": "@@ -1 +1,2 @@",
+        "old_start": 1,
+        "old_lines": 1,
+        "new_start": 1,
+        "new_lines": 2,
+        "lines": [
+          {
+            "kind": "context",
+            "old_no": 1,
+            "new_no": 1,
+            "content": "x"
+          },
+          {
+            "kind": "add",
+            "new_no": 2,
+            "content": "changed"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "truncated": false
+  },
+  {
+    "path": "weird\"name.txt",
+    "hunks": [
+      {
+        "header": "@@ -0,0 +1 @@",
+        "old_start": 0,
+        "old_lines": 0,
+        "new_start": 1,
+        "new_lines": 1,
+        "lines": [
+          {
+            "kind": "add",
+            "new_no": 1,
+            "content": "q"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "new_mode": "100644",
+    "truncated": false
+  }
+]

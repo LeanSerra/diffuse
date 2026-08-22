@@ -1,0 +1,13 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "blob.bin",
+    "hunks": [],
+    "binary": true,
+    "combined": false,
+    "truncated": false
+  }
+]

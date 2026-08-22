@@ -1,0 +1,14 @@
+diff --git a/café.txt b/café.txt
+index 587be6b..29a3685 100644
+--- a/café.txt
++++ b/café.txt
+@@ -1 +1,2 @@
+ x
++changed
+diff --git "a/weird\"name.txt" "b/weird\"name.txt"
+new file mode 100644
+index 0000000..bca70f3
+--- /dev/null
++++ "b/weird\"name.txt"
+@@ -0,0 +1 @@
++q

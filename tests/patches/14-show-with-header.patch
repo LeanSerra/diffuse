@@ -1,0 +1,16 @@
+commit 179dd4a560cdebe9eae8bb95d17ec5aa26b23082
+Author: fixture <fixture@diffuse>
+Date:   Thu Aug 20 22:57:25 2026 -0300
+
+    main-change
+
+diff --git a/simple.txt b/simple.txt
+index bfdfbcd..47e9f19 100644
+--- a/simple.txt
++++ b/simple.txt
+@@ -1,4 +1,4 @@
+ alpha
+-bravo
++MAIN
+ charlie
+ delta

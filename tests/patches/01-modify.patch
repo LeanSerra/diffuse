@@ -1,0 +1,10 @@
+diff --git a/simple.txt b/simple.txt
+index bfdfbcd..3eb955c 100644
+--- a/simple.txt
++++ b/simple.txt
+@@ -1,4 +1,4 @@
+ alpha
+-bravo
++BRAVO
+ charlie
+ delta

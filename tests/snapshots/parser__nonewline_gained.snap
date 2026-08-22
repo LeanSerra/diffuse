@@ -1,0 +1,34 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "nonewline.txt",
+    "hunks": [
+      {
+        "header": "@@ -1 +1 @@",
+        "old_start": 1,
+        "old_lines": 1,
+        "new_start": 1,
+        "new_lines": 1,
+        "lines": [
+          {
+            "kind": "del",
+            "old_no": 1,
+            "content": "no trailing newline",
+            "no_newline": true
+          },
+          {
+            "kind": "add",
+            "new_no": 1,
+            "content": "now it has one"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "truncated": false
+  }
+]

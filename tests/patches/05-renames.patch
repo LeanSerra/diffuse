@@ -1,0 +1,16 @@
+diff --git a/with space.txt b/moved-verbatim.txt
+similarity index 100%
+rename from with space.txt
+rename to moved-verbatim.txt
+diff --git a/renameme.txt b/renamed.txt
+similarity index 73%
+rename from renameme.txt
+rename to renamed.txt
+index 2c5555d..5d24619 100644
+--- a/renameme.txt
++++ b/renamed.txt
+@@ -1,3 +1,3 @@
+ original content here
+-second line
++SECOND LINE
+ third line

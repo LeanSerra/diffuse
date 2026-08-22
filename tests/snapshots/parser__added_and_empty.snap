@@ -1,0 +1,42 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "added.txt",
+    "hunks": [
+      {
+        "header": "@@ -0,0 +1,2 @@",
+        "old_start": 0,
+        "old_lines": 0,
+        "new_start": 1,
+        "new_lines": 2,
+        "lines": [
+          {
+            "kind": "add",
+            "new_no": 1,
+            "content": "brand new"
+          },
+          {
+            "kind": "add",
+            "new_no": 2,
+            "content": "second"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "new_mode": "100644",
+    "truncated": false
+  },
+  {
+    "path": "empty.txt",
+    "hunks": [],
+    "binary": false,
+    "combined": false,
+    "new_mode": "100644",
+    "truncated": false
+  }
+]

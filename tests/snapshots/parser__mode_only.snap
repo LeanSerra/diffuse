@@ -1,0 +1,15 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "exec.sh",
+    "hunks": [],
+    "binary": false,
+    "combined": false,
+    "old_mode": "100644",
+    "new_mode": "100755",
+    "truncated": false
+  }
+]

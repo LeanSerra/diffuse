@@ -1,0 +1,14 @@
+diff --git a/code.c b/code.c
+index 016fd71..0320c11 100644
+--- a/code.c
++++ b/code.c
+@@ -2,3 +2,3 @@ int main(void)
+ {
+-	int x = 1;
++	int x = 42;
+ 	return x;
+@@ -8,3 +8,3 @@ void helper(void)
+ {
+-	int y = 2;
++	int y = 99;
+ 	(void)y;

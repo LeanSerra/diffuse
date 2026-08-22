@@ -1,0 +1,11 @@
+diff --cc simple.txt
+index 47e9f19,580d27a..dfc0729
+--- a/simple.txt
++++ b/simple.txt
+@@@ -1,4 -1,4 +1,4 @@@
+  alpha
+- MAIN
+ -SIDE
+++RESOLVED
+  charlie
+  delta

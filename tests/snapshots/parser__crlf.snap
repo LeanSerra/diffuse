@@ -1,0 +1,45 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "crlf.txt",
+    "hunks": [
+      {
+        "header": "@@ -1,3 +1,3 @@",
+        "old_start": 1,
+        "old_lines": 3,
+        "new_start": 1,
+        "new_lines": 3,
+        "lines": [
+          {
+            "kind": "context",
+            "old_no": 1,
+            "new_no": 1,
+            "content": "one"
+          },
+          {
+            "kind": "del",
+            "old_no": 2,
+            "content": "two"
+          },
+          {
+            "kind": "add",
+            "new_no": 2,
+            "content": "TWO"
+          },
+          {
+            "kind": "context",
+            "old_no": 3,
+            "new_no": 3,
+            "content": "three"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "truncated": false
+  }
+]

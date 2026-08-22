@@ -1,0 +1,78 @@
+---
+source: tests/parser.rs
+expression: files
+---
+[
+  {
+    "path": "code.c",
+    "hunks": [
+      {
+        "header": "@@ -2,3 +2,3 @@ int main(void)",
+        "old_start": 2,
+        "old_lines": 3,
+        "new_start": 2,
+        "new_lines": 3,
+        "section": "int main(void)",
+        "lines": [
+          {
+            "kind": "context",
+            "old_no": 2,
+            "new_no": 2,
+            "content": "{"
+          },
+          {
+            "kind": "del",
+            "old_no": 3,
+            "content": "\tint x = 1;"
+          },
+          {
+            "kind": "add",
+            "new_no": 3,
+            "content": "\tint x = 42;"
+          },
+          {
+            "kind": "context",
+            "old_no": 4,
+            "new_no": 4,
+            "content": "\treturn x;"
+          }
+        ]
+      },
+      {
+        "header": "@@ -8,3 +8,3 @@ void helper(void)",
+        "old_start": 8,
+        "old_lines": 3,
+        "new_start": 8,
+        "new_lines": 3,
+        "section": "void helper(void)",
+        "lines": [
+          {
+            "kind": "context",
+            "old_no": 8,
+            "new_no": 8,
+            "content": "{"
+          },
+          {
+            "kind": "del",
+            "old_no": 9,
+            "content": "\tint y = 2;"
+          },
+          {
+            "kind": "add",
+            "new_no": 9,
+            "content": "\tint y = 99;"
+          },
+          {
+            "kind": "context",
+            "old_no": 10,
+            "new_no": 10,
+            "content": "\t(void)y;"
+          }
+        ]
+      }
+    ],
+    "binary": false,
+    "combined": false,
+    "truncated": false
+  }
+]

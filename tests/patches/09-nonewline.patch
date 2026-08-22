@@ -1,0 +1,9 @@
+diff --git a/nonewline.txt b/nonewline.txt
+index 69db55d..acc92b8 100644
+--- a/nonewline.txt
++++ b/nonewline.txt
+@@ -1 +1 @@
+-no trailing newline
+\ No newline at end of file
++no trailing newline CHANGED
+\ No newline at end of file

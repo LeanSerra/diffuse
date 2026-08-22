@@ -98,5 +98,3 @@ not blindly accepted.
 - Combined diffs from merge commits render without old-side line numbers: each
   `-` belongs to a different parent, so a single number would be wrong.
 - Syntax highlighting and side-by-side view are not implemented.
-
-See `PLAN.md` for why each of these is the way it is.

@@ -109,7 +109,9 @@ impl Runner {
     }
 
     /// Options that protect the parser and the transport. Never anything that
-    /// changes what the diff means — see PLAN.md §1.
+    /// changes what the diff means: colour escapes appear even through a pipe
+    /// when `color.ui = always`, an external diff driver replaces the patch
+    /// with arbitrary output, and non-ASCII paths arrive octal-escaped.
     fn base(&self) -> Vec<String> {
         let mut v = vec![
             "-c".into(),

@@ -95,7 +95,7 @@ fn c_distinguishes_types_functions_constants_and_operators() {
     let lines = highlight("a.c", src).unwrap();
     let class_at = |line: usize, needle: &str| -> Option<String> {
         let text = src.lines().nth(line)?;
-        let at = text.find(needle)? as usize;
+        let at = text.find(needle)?;
         let at16 = text[..at].encode_utf16().count();
         lines[line]
             .iter()

@@ -589,7 +589,7 @@ body {
   color: var(--ink);
 }
 
-.lanes, .lanes-slot {
+.lanes {
   flex: 0 0 auto;
   display: block;
   min-width: 14px;
@@ -606,15 +606,20 @@ body {
 }
 .commit-row[aria-current="true"] .lanes .dot { stroke: var(--accent); }
 
-.lanes-slot { position: relative; }
+/* Uncommitted work is marked out in amber, the colour used everywhere else for
+   "where you are" rather than for anything in the diff itself. */
+.commit-row.pending .commit-sub { color: var(--accent); }
+.pending-line {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+/* Solid ring, not a dashed one: at 8px a dashed circle just reads as stray
+   dots. The dashed line below carries the "not committed yet" meaning. */
 .pending-dot {
-  position: absolute;
-  top: 15px;
-  left: 3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px dashed var(--ink-dim);
+  fill: var(--accent);
+  stroke: var(--accent);
+  stroke-width: 2;
 }
 
 .commit-text {

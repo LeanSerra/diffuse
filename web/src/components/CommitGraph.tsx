@@ -44,15 +44,31 @@ export function CommitGraph({
 
       {page.range?.uncommitted && (
         <button
-          className="commit-row"
+          className="commit-row pending"
           aria-current={current === "worktree"}
           onClick={() => onPick("worktree")}
+          title="Everything not yet committed, on top of the newest commit"
         >
-          <span className="lanes-slot" style={{ width: width * LANE }}>
-            <span className="pending-dot" />
-          </span>
+          {/* A real node on the graph, joined to the commit below by a dashed
+              line: this work sits on top of it but is not a commit yet. */}
+          <svg className="lanes" width={width * LANE} height={ROW} aria-hidden="true">
+            <line
+              className="pending-line"
+              x1={(page.graph[0]?.lane ?? 0) * LANE + LANE / 2}
+              y1={ROW / 2}
+              x2={(page.graph[0]?.lane ?? 0) * LANE + LANE / 2}
+              y2={ROW}
+            />
+            <circle
+              className="pending-dot"
+              cx={(page.graph[0]?.lane ?? 0) * LANE + LANE / 2}
+              cy={ROW / 2}
+              r={4}
+            />
+          </svg>
           <span className="commit-text">
             <span className="commit-sub">Uncommitted changes</span>
+            <span className="commit-meta">working tree · not a commit yet</span>
           </span>
         </button>
       )}

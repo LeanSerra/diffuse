@@ -24,6 +24,15 @@
   --del-mark: #c02434;
   --del-gutter: #f6ced2;
 
+  --t-kw: #8250df;
+  --t-typ: #953800;
+  --t-fn: #6639ba;
+  --t-str: #0a3069;
+  --t-num: #0550ae;
+  --t-com: #6a737d;
+  --t-esc: #953800;
+  --t-pun: #57606a;
+
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo,
     Consolas, "DejaVu Sans Mono", monospace;
   --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -56,6 +65,14 @@
 --del-word: #6b232c;
 --del-mark: #f0737f;
 --del-gutter: #421d22;
+--t-kw: #d2a8ff;
+--t-typ: #ffa657;
+--t-fn: #d2a8ff;
+--t-str: #a5d6ff;
+--t-num: #79c0ff;
+--t-com: #8b949e;
+--t-esc: #ffa657;
+--t-pun: #9aa2b1;
   }
 }
 
@@ -78,6 +95,14 @@
 --del-word: #6b232c;
 --del-mark: #f0737f;
 --del-gutter: #421d22;
+--t-kw: #d2a8ff;
+--t-typ: #ffa657;
+--t-fn: #d2a8ff;
+--t-str: #a5d6ff;
+--t-num: #79c0ff;
+--t-com: #8b949e;
+--t-esc: #ffa657;
+--t-pun: #9aa2b1;
 }
 
 * { box-sizing: border-box; }
@@ -415,13 +440,22 @@ body {
 .row[data-k="del"] .n { background: var(--del-gutter); color: var(--del-mark); }
 .row[data-k="del"] .c::before { color: var(--del-mark); }
 
-.row mark {
+/* Syntax owns the colour, the word range owns the background, so a segment
+   inside both still shows what changed and what it is. */
+.row .w {
   background: var(--add-word);
-  color: inherit;
   border-radius: 2px;
-  padding: 0 1px;
 }
-.row[data-k="del"] mark { background: var(--del-word); }
+.row[data-k="del"] .w { background: var(--del-word); }
+
+.t-kw { color: var(--t-kw); }
+.t-typ { color: var(--t-typ); }
+.t-fn { color: var(--t-fn); }
+.t-str { color: var(--t-str); }
+.t-num { color: var(--t-num); }
+.t-com { color: var(--t-com); font-style: italic; }
+.t-esc { color: var(--t-esc); }
+.t-pun { color: var(--t-pun); }
 
 .eof {
   display: block;

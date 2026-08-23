@@ -24,7 +24,7 @@ use tokio_stream::StreamExt;
 
 use crate::git::Runner;
 use crate::model::FileDiff;
-use crate::words;
+use crate::{highlight, words};
 
 /// Files larger than this are not sent until the reader explicitly asks.
 const LINE_CEILING: usize = 5000;
@@ -146,33 +146,51 @@ async fn file(State(app): State<App>, headers: HeaderMap, Query(q): Query<FileQu
     let r = app.runner.clone();
     let path = q.path.clone();
     let force = q.force == Some(1);
-    let result = tokio::task::spawn_blocking(move || {
-        if q.untracked == Some(1) {
-            return r.untracked_diff(&q.path).map(|d| vec![d]);
-        }
-        r.patch_for(&q.path, q.old.as_deref())
-            .map(|text| crate::parse::parse_patch(&text))
-            .map(|mut files| {
-                // git may report several files when rename detection pairs
-                // this path with another; keep the one that was asked for.
-                files.retain(|f| f.path == q.path || f.old_path.as_deref() == Some(q.path.as_str()));
-                files
-            })
-    })
-    .await
-    .unwrap();
+    let untracked = q.untracked == Some(1);
 
-    match result {
-        Ok(mut files) => {
+    // Everything here shells out to git and parses, so it all belongs off the
+    // async runtime — highlighting a large file is not a quick call.
+    let result = tokio::task::spawn_blocking(move || {
+        let parsed = if untracked {
+            r.untracked_diff(&q.path).map(|d| vec![d])
+        } else {
+            r.patch_for(&q.path, q.old.as_deref())
+                .map(|text| crate::parse::parse_patch(&text))
+                .map(|mut files| {
+                    // git may report several files when rename detection pairs
+                    // this path with another; keep the one that was asked for.
+                    files.retain(|f| {
+                        f.path == q.path || f.old_path.as_deref() == Some(q.path.as_str())
+                    });
+                    files
+                })
+        };
+
+        parsed.map(|mut files| {
             for f in files.iter_mut() {
                 let size: usize = f.hunks.iter().map(|h| h.lines.len()).sum();
                 if size > LINE_CEILING && !force {
                     f.truncated = true;
                     f.hunks.clear();
-                } else {
-                    words::annotate(&mut f.hunks);
+                    continue;
+                }
+                words::annotate(&mut f.hunks);
+                if untracked {
+                    // Nothing existed before, so the file itself is the new side.
+                    let text = r.read_untracked(&f.path).ok();
+                    highlight::annotate(f, None, text.as_deref());
+                } else if let Some((old, new)) = r.full_text(&f.path, f.old_path.as_deref()) {
+                    highlight::annotate(f, Some(&old), Some(&new));
                 }
             }
+            files
+        })
+    })
+    .await
+    .unwrap();
+
+    match result {
+        Ok(files) => {
             let empty = FileDiff {
                 path: path.clone(),
                 ..Default::default()

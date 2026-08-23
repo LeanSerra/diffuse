@@ -292,6 +292,58 @@ impl Runner {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 
+    /// The same diff with effectively unlimited context, which yields the
+    /// complete old and new text of one file. Highlighting needs whole files —
+    /// a hunk can open inside a block comment — and taking them from the diff
+    /// itself avoids resolving which revisions the user's argv actually names.
+    pub fn full_text(&self, path: &str, old_path: Option<&str>) -> Option<(String, String)> {
+        let (head, _) = self.split_pathspec();
+        let mut args: Vec<String> = vec!["--literal-pathspecs".into()];
+        args.extend(self.base());
+        args.push("-U1000000".into());
+        args.extend(head);
+        args.push("--".into());
+        if let Some(old) = old_path {
+            args.push(old.to_string());
+        }
+        args.push(path.to_string());
+        let out = self.raw(&args).ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let patch = String::from_utf8_lossy(&out.stdout);
+        let files = crate::parse::parse_patch(&patch);
+        let file = files
+            .iter()
+            .find(|f| f.path == path || f.old_path.as_deref() == Some(path))?;
+        if file.binary {
+            return None;
+        }
+        let mut old = String::new();
+        let mut new = String::new();
+        for hunk in &file.hunks {
+            for line in &hunk.lines {
+                match line.kind {
+                    crate::model::LineKind::Add => {
+                        new.push_str(&line.content);
+                        new.push('\n');
+                    }
+                    crate::model::LineKind::Del => {
+                        old.push_str(&line.content);
+                        old.push('\n');
+                    }
+                    crate::model::LineKind::Context => {
+                        old.push_str(&line.content);
+                        old.push('\n');
+                        new.push_str(&line.content);
+                        new.push('\n');
+                    }
+                }
+            }
+        }
+        Some((old, new))
+    }
+
     pub fn read_untracked(&self, path: &str) -> Result<String, GitError> {
         let full = self.repo.root.join(path);
         let bytes = std::fs::read(&full)?;
@@ -447,6 +499,7 @@ impl Runner {
                 content: (*l).to_string(),
                 no_newline: !ends_with_newline && i + 1 == lines.len(),
                 words: None,
+                syntax: None,
             });
         }
         let hunks = if count == 0 {

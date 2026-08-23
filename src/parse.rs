@@ -344,6 +344,7 @@ pub fn parse_patch(text: &str) -> Vec<FileDiff> {
             content,
             no_newline: false,
             words: None,
+                syntax: None,
         });
     }
 

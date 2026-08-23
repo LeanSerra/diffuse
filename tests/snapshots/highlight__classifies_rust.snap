@@ -1,0 +1,14 @@
+---
+source: tests/highlight.rs
+expression: "render(\"a.rs\",\n\"// note\\nfn main() {\\n    let x = 42;\\n    let s = \\\"hi\\\";\\n}\\n\")"
+---
+// note
+com····
+fn main() {
+kw fn··pu p
+    let x = 42;
+    kw·   k nup
+    let s = "hi";
+    kw·   k str·p
+}
+p

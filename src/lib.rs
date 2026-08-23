@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod git;
+pub mod highlight;
 pub mod model;
 pub mod parse;
 pub mod server;

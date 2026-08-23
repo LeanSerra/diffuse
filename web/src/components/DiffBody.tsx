@@ -1,20 +1,38 @@
 import type { ReactNode } from "react";
-import type { FileDiff, Hunk, Line, Range } from "../types";
+import type { FileDiff, Hunk, Line, Range, Span } from "../types";
 
 const SIGIL = { add: "+", del: "-", context: " " } as const;
 
-/** Word ranges arrive as UTF-16 offsets, which is exactly what slice() wants. */
+function covering<T extends { start: number; end: number }>(ranges: T[] | undefined, at: number) {
+  return ranges?.find((r) => r.start <= at && at < r.end);
+}
+
+/**
+ * Syntax classes and word-level ranges both decorate the same characters, so
+ * the line is cut at every boundary either of them introduces. Syntax owns the
+ * colour, the word range owns the background, and a segment inside both keeps
+ * both. All offsets are UTF-16 code units, which is exactly what slice() wants.
+ */
 function content(line: Line) {
-  const { content: text, words } = line;
-  if (!words || words.length === 0) return text;
+  const { content: text, words, syntax } = line;
+  if (!words?.length && !syntax?.length) return text;
+
+  const length = text.length;
+  const edges = new Set<number>([0, length]);
+  for (const s of syntax ?? []) { edges.add(s.start); edges.add(s.end); }
+  for (const w of words ?? []) { edges.add(w.start); edges.add(w.end); }
+  const cuts = [...edges].filter((n) => n >= 0 && n <= length).sort((a, b) => a - b);
+
   const out: ReactNode[] = [];
-  let at = 0;
-  words.forEach((w: Range, i) => {
-    if (w.start > at) out.push(text.slice(at, w.start));
-    out.push(<mark key={i}>{text.slice(w.start, w.end)}</mark>);
-    at = w.end;
-  });
-  if (at < text.length) out.push(text.slice(at));
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const [from, to] = [cuts[i], cuts[i + 1]];
+    if (from === to) continue;
+    const piece = text.slice(from, to);
+    const token = covering<Span>(syntax, from);
+    const changed = Boolean(covering<Range>(words, from));
+    const names = [token && `t-${token.class}`, changed && "w"].filter(Boolean).join(" ");
+    out.push(names ? <span className={names} key={i}>{piece}</span> : piece);
+  }
   return out;
 }
 

@@ -41,6 +41,15 @@ pub struct Range {
     pub end: usize,
 }
 
+/// A run of characters sharing one syntax class. Offsets are UTF-16 code
+/// units, like `Range`, so the browser can slice with them directly.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub class: &'static str,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Line {
     pub kind: LineKind,
@@ -55,6 +64,9 @@ pub struct Line {
     /// diffing found a confident pairing.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub words: Option<Vec<Range>>,
+    /// Syntax classes for this line, from highlighting the whole file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<Vec<Span>>,
 }
 
 #[derive(Debug, Clone, Serialize)]

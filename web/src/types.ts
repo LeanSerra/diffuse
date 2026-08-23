@@ -13,6 +13,9 @@ export interface FileEntry {
 
 export interface Range { start: number; end: number }
 
+/** A run of characters sharing one syntax class, in UTF-16 offsets. */
+export interface Span { start: number; end: number; class: string }
+
 export interface Line {
   kind: "context" | "add" | "del";
   old_no?: number;
@@ -20,6 +23,7 @@ export interface Line {
   content: string;
   no_newline?: boolean;
   words?: Range[];
+  syntax?: Span[];
 }
 
 export interface Hunk {

@@ -49,11 +49,15 @@ diffuse show <commit>        # git show <commit>
 
 ## Install
 
+The UI is compiled into the binary, so it has to be built once first:
+
 ```sh
+cd web && pnpm install && pnpm build && cd ..
 cargo install --path .
 ```
 
-Requires `git` on your `PATH`. No Node runtime is needed at install time.
+Running diffuse needs only `git` on your `PATH` — Node is a build-time
+requirement, not a runtime one.
 
 ## Flags
 

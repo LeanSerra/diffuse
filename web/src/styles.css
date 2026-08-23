@@ -645,9 +645,17 @@ body {
   margin: 4px 0 0;
   padding: 10px 14px;
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--ink-dim);
   border-top: 1px solid var(--rule);
+}
+.graph-note p { margin: 0 0 7px; }
+.graph-note p:last-child { margin-bottom: 0; }
+.graph-note b { color: var(--ink-mid); font-family: var(--mono); font-weight: 600; }
+.graph-note code {
+  font-family: var(--mono);
+  color: var(--accent);
+  overflow-wrap: anywhere;
 }
 
 .keys {

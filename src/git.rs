@@ -594,6 +594,8 @@ pub struct CommitRange {
     /// Commits the *other* side has that this one does not. The aggregate diff
     /// reverses these, and no commit in the list explains them.
     pub behind: u32,
+    /// The revision the user named, so the UI can suggest a three-dot form.
+    pub other: Option<String>,
     /// Whether uncommitted work is part of the aggregate.
     pub uncommitted: bool,
 }
@@ -658,6 +660,7 @@ impl Runner {
         Some(CommitRange {
             spec: format!("{base}..{head}"),
             behind,
+            other: if behind > 0 { revs.first().cloned() } else { None },
             uncommitted: self.worktree_is_right_side() && self.is_dirty(),
         })
     }

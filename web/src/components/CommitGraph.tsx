@@ -97,12 +97,26 @@ export function CommitGraph({
       ))}
 
       {page.range && page.range.behind > 0 && (
-        <p className="graph-note">
-          The other side has {page.range.behind}{" "}
-          {page.range.behind === 1 ? "commit" : "commits"} this branch does not.
-          The combined diff reverses {page.range.behind === 1 ? "it" : "them"};
-          no commit listed here explains that part.
-        </p>
+        <div className="graph-note">
+          <p>
+            <b>{page.range.other ?? "The other side"}</b> has moved on: it has{" "}
+            {page.range.behind}{" "}
+            {page.range.behind === 1 ? "commit" : "commits"} this branch does not.
+          </p>
+          <p>
+            {command} compares against its <em>tip</em>, so{" "}
+            {page.range.behind === 1 ? "that commit shows" : "those commits show"}{" "}
+            up in the diff as deletions — this branch simply does not have{" "}
+            {page.range.behind === 1 ? "it" : "them"} yet. The commits below are
+            only what this branch added.
+          </p>
+          {page.range.other && (
+            <p>
+              To compare against the point the branches split instead, run{" "}
+              <code>diffuse diff {page.range.other}...HEAD</code>
+            </p>
+          )}
+        </div>
       )}
       {page.hasMore && <p className="graph-note">Showing the newest {page.commits.length}.</p>}
     </nav>

@@ -60,6 +60,8 @@ export interface CommitRange {
   spec: string;
   /** Commits the other side has that this one does not; the aggregate reverses them. */
   behind: number;
+  /** The revision named on the command line, when it has moved ahead. */
+  other: string | null;
   uncommitted: boolean;
 }
 

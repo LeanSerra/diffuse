@@ -38,6 +38,7 @@ diffuse show <commit>        # git show <commit>
 - **Word-level highlighting** — the characters that changed within a line, not just the line.
 - **Untracked files included.** `git diff` hides files you have not staged yet, which makes a new file invisible. diffuse synthesizes a patch for them whenever the right-hand side of the comparison is your working tree.
 - **Syntax highlighting** over 213 grammars, computed from the whole file so a hunk opening inside a block comment is still a comment.
+- **A commit graph for the range you asked for.** `diffuse diff master` renders the aggregate; press `g` to see the commits that produce it, with merge lanes, and click one to read it on its own.
 - **Rename-aware.** A rename is shown as a rename, not a delete plus an add.
 - **A file list that follows your scroll**, and a file header that stays pinned so a long diff never leaves you guessing.
 - **Read-only, by design.** No endpoint writes, so a bug can never cost you work.

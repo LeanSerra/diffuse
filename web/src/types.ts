@@ -56,6 +56,33 @@ export interface Commit {
   merge: boolean;
 }
 
+export interface CommitRange {
+  spec: string;
+  /** Commits the other side has that this one does not; the aggregate reverses them. */
+  behind: number;
+  uncommitted: boolean;
+}
+
+export interface Commit {
+  sha: string; short: string; parents: string[];
+  author: string; date: string; subject: string; refs: string[];
+}
+
+/** Lane geometry for one row of the graph. */
+export interface GraphNode {
+  lane: number;
+  edges: [number, number][];
+  through: number[];
+  width: number;
+}
+
+export interface CommitPage {
+  range: CommitRange | null;
+  commits: Commit[];
+  graph: GraphNode[];
+  hasMore: boolean;
+}
+
 export interface Session {
   command: string;
   root: string;
@@ -65,6 +92,7 @@ export interface Session {
   worktreeRight: boolean;
   ignoredFlags: string[];
   subcommand: string;
+  range: CommitRange | null;
 }
 
 export interface FileList {

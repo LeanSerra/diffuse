@@ -1,0 +1,8 @@
+---
+source: tests/graph.rs
+expression: "draw(&[(\"d\", &[\"c\"]), (\"c\", &[\"b\"]), (\"b\", &[\"a\"]), (\"a\", &[]),])"
+---
+*  d -> c
+*  c -> b
+*  b -> a
+*  a ->

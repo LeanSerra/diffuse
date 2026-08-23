@@ -59,9 +59,10 @@ const CHIP: Partial<Record<FileEntry["status"], string>> = {
 };
 
 export function FileCard({
-  entry, current, registerRef, onCollapse,
+  entry, rev, current, registerRef, onCollapse,
 }: {
   entry: FileEntry;
+  rev: string | null;
   current: boolean;
   registerRef: (path: string, el: HTMLElement | null) => void;
   /** Bring this card's header to the top after it collapses. */
@@ -146,15 +147,15 @@ export function FileCard({
   useEffect(() => {
     if (!near || diff || error) return;
     let live = true;
-    getFile(entry)
+    getFile(entry, rev)
       .then((d) => live && setDiff(d))
       .catch((e) => live && setError(String(e.message ?? e)));
     return () => { live = false; };
-  }, [near, diff, error, entry]);
+  }, [near, diff, error, entry, rev]);
 
   const force = () => {
     setDiff(null);
-    getFile(entry, true).then(setDiff).catch((e) => setError(String(e.message ?? e)));
+    getFile(entry, rev, true).then(setDiff).catch((e) => setError(String(e.message ?? e)));
   };
 
   const { dir, base } = splitPath(entry.path);

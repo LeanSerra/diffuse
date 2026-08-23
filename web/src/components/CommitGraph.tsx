@@ -1,0 +1,111 @@
+import { useEffect, useState } from "react";
+import { getCommits } from "../api";
+import type { Commit, CommitPage, GraphNode } from "../types";
+
+const LANE = 14;
+const ROW = 38;
+
+/** One row's lines: what enters from above, what leaves below. */
+function Lanes({ node, width }: { node: GraphNode; width: number }) {
+  const x = (lane: number) => lane * LANE + LANE / 2;
+  const mid = ROW / 2;
+  const incoming = node.edges.filter(([from, to]) => to === node.lane && from !== node.lane);
+  const outgoing = node.edges.filter(([from]) => from === node.lane);
+  return (
+    <svg className="lanes" width={width * LANE} height={ROW} aria-hidden="true">
+      {node.through.map((lane) => (
+        <line key={`t${lane}`} x1={x(lane)} y1={0} x2={x(lane)} y2={ROW} />
+      ))}
+      {incoming.map(([from], i) => (
+        <path key={`i${i}`} d={`M${x(from)},0 C${x(from)},${mid * 0.7} ${x(node.lane)},${mid * 0.4} ${x(node.lane)},${mid}`} />
+      ))}
+      {outgoing.map(([, to], i) => (
+        <path key={`o${i}`} d={`M${x(node.lane)},${mid} C${x(node.lane)},${mid + mid * 0.4} ${x(to)},${mid + mid * 0.7} ${x(to)},${ROW}`} />
+      ))}
+      <circle className="dot" cx={x(node.lane)} cy={mid} r={4} />
+    </svg>
+  );
+}
+
+export function CommitGraph({
+  current, onPick,
+}: {
+  current: string | null;
+  onPick: (rev: string | null) => void;
+}) {
+  const [page, setPage] = useState<CommitPage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    getCommits()
+      .then((p) => live && setPage(p))
+      .catch((e) => live && setError(String(e.message ?? e)));
+    return () => { live = false; };
+  }, []);
+
+  if (error) return <nav className="side"><p className="note">{error}</p></nav>;
+  if (!page) return <nav className="side"><div className="side-head">loading commits</div></nav>;
+
+  const width = Math.max(1, ...page.graph.map((g) => g.width));
+
+  return (
+    <nav className="side" aria-label="Commits">
+      <div className="side-head">
+        {page.commits.length} {page.commits.length === 1 ? "commit" : "commits"}
+      </div>
+
+      <button
+        className="commit-row"
+        aria-current={current === null}
+        onClick={() => onPick(null)}
+      >
+        <span className="commit-sub">Everything, as one diff</span>
+      </button>
+
+      {page.range?.uncommitted && (
+        <button
+          className="commit-row"
+          aria-current={current === "worktree"}
+          onClick={() => onPick("worktree")}
+        >
+          <span className="lanes-slot" style={{ width: width * LANE }}>
+            <span className="pending-dot" />
+          </span>
+          <span className="commit-text">
+            <span className="commit-sub">Uncommitted changes</span>
+          </span>
+        </button>
+      )}
+
+      {page.commits.map((c: Commit, i) => (
+        <button
+          key={c.sha}
+          className="commit-row"
+          aria-current={current === c.sha}
+          onClick={() => onPick(c.sha)}
+          title={`${c.short} · ${c.author} · ${c.date.slice(0, 10)}`}
+        >
+          <Lanes node={page.graph[i]} width={width} />
+          <span className="commit-text">
+            <span className="commit-sub">{c.subject}</span>
+            <span className="commit-meta">
+              {c.short} · {c.author}
+              {c.refs.length > 0 && <span className="commit-refs"> {c.refs.join(" ")}</span>}
+            </span>
+          </span>
+        </button>
+      ))}
+
+      {page.range && page.range.behind > 0 && (
+        <p className="graph-note">
+          The other side has {page.range.behind}{" "}
+          {page.range.behind === 1 ? "commit" : "commits"} this branch does not.
+          The combined diff reverses {page.range.behind === 1 ? "it" : "them"};
+          no commit listed here explains that part.
+        </p>
+      )}
+      {page.hasMore && <p className="graph-note">Showing the newest {page.commits.length}.</p>}
+    </nav>
+  );
+}

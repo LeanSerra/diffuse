@@ -1,0 +1,10 @@
+---
+source: tests/graph.rs
+expression: "draw(&[(\"m2\", &[\"m1\", \"b1\"]), (\"m1\", &[\"m0\", \"a1\"]), (\"b1\", &[\"base\"]),\n(\"a1\", &[\"base\"]), (\"m0\", &[\"base\"]), (\"base\", &[]),])"
+---
+*_  m2 -> m1,b1
+*_|_  m1 -> m0,a1
+| * |  b1 -> base
+| |_*  a1 -> base
+* |  m0 -> base
+*  base ->

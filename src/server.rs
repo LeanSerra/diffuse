@@ -78,12 +78,31 @@ fn authorized(app: &App, headers: &HeaderMap, q: Option<&str>) -> bool {
 
 #[derive(Deserialize)]
 struct Auth {
+    rev: Option<String>,
     t: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CommitsQuery {
+    skip: Option<usize>,
+    limit: Option<usize>,
+    t: Option<String>,
+}
+
+/// `rev` selects what to diff: a commit sha, or `worktree` for uncommitted
+/// work. Absent means the command diffuse was launched with.
+fn runner_for(app: &App, rev: Option<&str>) -> std::sync::Arc<Runner> {
+    match rev {
+        None => app.runner.clone(),
+        Some("worktree") => std::sync::Arc::new(app.runner.for_worktree()),
+        Some(sha) => std::sync::Arc::new(app.runner.for_commit(sha)),
+    }
 }
 
 #[derive(Deserialize)]
 struct FileQuery {
     path: String,
+    rev: Option<String>,
     old: Option<String>,
     untracked: Option<u8>,
     force: Option<u8>,
@@ -98,7 +117,7 @@ async fn session(
     if !authorized(&app, &headers, q.t.as_deref()) {
         return unauthorized();
     }
-    let r = app.runner.clone();
+    let r = runner_for(&app, q.rev.as_deref());
     let body = tokio::task::spawn_blocking(move || {
         serde_json::json!({
             "command": r.inv.display_command(),
@@ -109,6 +128,7 @@ async fn session(
             "worktreeRight": r.worktree_is_right_side(),
             "ignoredFlags": r.inv.ignored,
             "subcommand": r.inv.subcommand.as_str(),
+            "range": r.range(),
         })
     })
     .await
@@ -120,7 +140,7 @@ async fn files(State(app): State<App>, headers: HeaderMap, Query(q): Query<Auth>
     if !authorized(&app, &headers, q.t.as_deref()) {
         return unauthorized();
     }
-    let r = app.runner.clone();
+    let r = runner_for(&app, q.rev.as_deref());
     match tokio::task::spawn_blocking(move || r.file_list()).await.unwrap() {
         Ok(files) => {
             let additions: u32 = files.iter().map(|f| f.additions).sum();
@@ -143,7 +163,7 @@ async fn file(State(app): State<App>, headers: HeaderMap, Query(q): Query<FileQu
     if !authorized(&app, &headers, q.t.as_deref()) {
         return unauthorized();
     }
-    let r = app.runner.clone();
+    let r = runner_for(&app, q.rev.as_deref());
     let path = q.path.clone();
     let force = q.force == Some(1);
     let untracked = q.untracked == Some(1);
@@ -203,6 +223,43 @@ async fn file(State(app): State<App>, headers: HeaderMap, Query(q): Query<FileQu
         )
             .into_response(),
     }
+}
+
+async fn commits(
+    State(app): State<App>,
+    headers: HeaderMap,
+    Query(q): Query<CommitsQuery>,
+) -> Response {
+    if !authorized(&app, &headers, q.t.as_deref()) {
+        return unauthorized();
+    }
+    let r = app.runner.clone();
+    let skip = q.skip.unwrap_or(0);
+    let limit = q.limit.unwrap_or(200).min(500);
+    let body = tokio::task::spawn_blocking(move || {
+        let Some(range) = r.range() else {
+            return serde_json::json!({ "range": null, "commits": [], "graph": [] });
+        };
+        // One extra row tells us whether another page exists without counting
+        // the whole range.
+        let mut page = r.commits(&range.spec, skip, limit + 1);
+        let more = page.len() > limit;
+        page.truncate(limit);
+        let spec: Vec<(String, Vec<String>)> = page
+            .iter()
+            .map(|c| (c.sha.clone(), c.parents.clone()))
+            .collect();
+        let graph = crate::graph::lay_out(&spec);
+        serde_json::json!({
+            "range": range,
+            "commits": page,
+            "graph": graph,
+            "hasMore": more,
+        })
+    })
+    .await
+    .unwrap();
+    Json(body).into_response()
 }
 
 /// Holding this stream open is what keeps diffuse alive; closing the tab is
@@ -268,6 +325,7 @@ pub async fn serve(runner: Runner, dev: bool) -> std::io::Result<Serving> {
         .route("/api/session", get(session))
         .route("/api/files", get(files))
         .route("/api/file", get(file))
+        .route("/api/commits", get(commits))
         .route("/api/events", get(events))
         .fallback(asset)
         .with_state(app.clone());

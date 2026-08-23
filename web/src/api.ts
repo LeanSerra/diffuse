@@ -1,4 +1,4 @@
-import type { FileDiff, FileEntry, FileList, Session } from "./types";
+import type { CommitPage, FileDiff, FileEntry, FileList, Session } from "./types";
 
 /**
  * The token is handed to the page in its launch URL. It is moved into
@@ -43,11 +43,17 @@ async function get<T>(path: string, params: Record<string, string> = {}): Promis
   return res.json() as Promise<T>;
 }
 
-export const getSession = () => get<Session>("/api/session");
-export const getFiles = () => get<FileList>("/api/files");
+/** `rev` is a commit sha, "worktree", or null for the launched command. */
+export const getSession = (rev: string | null) =>
+  get<Session>("/api/session", rev ? { rev } : {});
+export const getFiles = (rev: string | null) =>
+  get<FileList>("/api/files", rev ? { rev } : {});
+export const getCommits = (skip = 0) =>
+  get<CommitPage>("/api/commits", { skip: String(skip) });
 
-export function getFile(entry: FileEntry, force = false): Promise<FileDiff> {
+export function getFile(entry: FileEntry, rev: string | null, force = false): Promise<FileDiff> {
   const params: Record<string, string> = { path: entry.path };
+  if (rev) params.rev = rev;
   if (entry.old_path) params.old = entry.old_path;
   if (entry.untracked) params.untracked = "1";
   if (force) params.force = "1";

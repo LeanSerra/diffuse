@@ -574,3 +574,177 @@ fn measure_untracked(path: &Path) -> Option<(u32, bool)> {
     }
     Some((lines, false))
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Commit {
+    pub sha: String,
+    pub short: String,
+    pub parents: Vec<String>,
+    pub author: String,
+    pub date: String,
+    pub subject: String,
+    pub refs: Vec<String>,
+}
+
+/// The commits that make up the diff being shown.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CommitRange {
+    /// `git log` argument, e.g. `abc123..HEAD`.
+    pub spec: String,
+    /// Commits the *other* side has that this one does not. The aggregate diff
+    /// reverses these, and no commit in the list explains them.
+    pub behind: u32,
+    /// Whether uncommitted work is part of the aggregate.
+    pub uncommitted: bool,
+}
+
+impl Runner {
+    /// The commit range this command's diff decomposes into, if it has one.
+    ///
+    /// `diffuse diff master` is answered with `merge-base(master, HEAD)..HEAD`
+    /// rather than `master..HEAD`: they agree until master moves, and after
+    /// that the merge base is still "what this branch did", which is the part a
+    /// commit list can honestly explain.
+    pub fn range(&self) -> Option<CommitRange> {
+        if self.inv.subcommand != Subcommand::Diff {
+            return None;
+        }
+        let (head_args, _) = self.split_pathspec();
+        if head_args.iter().any(|a| a == "--cached" || a == "--staged") {
+            return None;
+        }
+        let revs: Vec<String> = head_args
+            .iter()
+            .filter(|a| !a.starts_with('-'))
+            .filter(|a| {
+                a.contains("..")
+                    || self
+                        .plumbing(&["rev-parse", "--verify", "--quiet", &format!("{a}^{{commit}}")])
+                        .is_some()
+            })
+            .cloned()
+            .collect();
+
+        let (base, head) = match revs.as_slice() {
+            [] => return None,
+            [one] if one.contains("...") => {
+                let (a, b) = one.split_once("...")?;
+                let b = if b.is_empty() { "HEAD" } else { b };
+                let a = if a.is_empty() { "HEAD" } else { a };
+                (self.merge_base(a, b)?, b.to_string())
+            }
+            [one] if one.contains("..") => {
+                let (a, b) = one.split_once("..")?;
+                let b = if b.is_empty() { "HEAD" } else { b };
+                (a.to_string(), b.to_string())
+            }
+            [one] => (self.merge_base(one, "HEAD")?, "HEAD".to_string()),
+            [a, b, ..] => (self.merge_base(a, b)?, b.clone()),
+        };
+
+        let count = |spec: &str| -> u32 {
+            self.plumbing(&["rev-list", "--count", spec])
+                .and_then(|s| s.trim().parse().ok())
+                .unwrap_or(0)
+        };
+        // Only meaningful when the right side is the working tree: that is when
+        // the other side may have moved on without us.
+        let behind = if self.worktree_is_right_side() && revs.len() == 1 {
+            count(&format!("{}..{}", head, revs[0]))
+        } else {
+            0
+        };
+
+        Some(CommitRange {
+            spec: format!("{base}..{head}"),
+            behind,
+            uncommitted: self.worktree_is_right_side() && self.is_dirty(),
+        })
+    }
+
+    fn merge_base(&self, a: &str, b: &str) -> Option<String> {
+        self.plumbing(&["merge-base", a, b])
+    }
+
+    fn is_dirty(&self) -> bool {
+        self.plumbing(&["status", "--porcelain"])
+            .is_some_and(|s| !s.trim().is_empty())
+    }
+
+    /// One page of the range, newest first.
+    pub fn commits(&self, spec: &str, skip: usize, limit: usize) -> Vec<Commit> {
+        // One extra field separator per record keeps parsing unambiguous even
+        // when a subject contains anything at all.
+        let fmt = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%aI%x1f%s%x1f%D";
+        let args: Vec<String> = vec![
+            "log".into(),
+            "--topo-order".into(),
+            fmt.into(),
+            "-z".into(),
+            format!("--skip={skip}"),
+            format!("--max-count={limit}"),
+            spec.into(),
+        ];
+        let Ok(out) = self.raw(&args) else {
+            return Vec::new();
+        };
+        if !out.status.success() {
+            return Vec::new();
+        }
+        String::from_utf8_lossy(&out.stdout)
+            .split('\0')
+            .filter(|r| !r.trim().is_empty())
+            .filter_map(|record| {
+                let mut f = record.trim_start_matches('\n').split('\x1f');
+                Some(Commit {
+                    sha: f.next()?.to_string(),
+                    short: f.next()?.to_string(),
+                    parents: f
+                        .next()?
+                        .split_whitespace()
+                        .map(str::to_string)
+                        .collect(),
+                    author: f.next()?.to_string(),
+                    date: f.next()?.to_string(),
+                    subject: f.next()?.to_string(),
+                    refs: f
+                        .next()
+                        .unwrap_or_default()
+                        .split(", ")
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .collect(),
+                })
+            })
+            .collect()
+    }
+
+    /// A runner for one commit, so the graph can open any row without the
+    /// server needing a second session.
+    pub fn for_commit(&self, rev: &str) -> Runner {
+        Runner {
+            repo: self.repo.clone(),
+            inv: Invocation {
+                subcommand: Subcommand::Show,
+                args: vec![rev.to_string()],
+                ignored: Vec::new(),
+                want_untracked: false,
+                open_browser: false,
+            },
+        }
+    }
+
+    /// A runner for everything not yet committed.
+    pub fn for_worktree(&self) -> Runner {
+        Runner {
+            repo: self.repo.clone(),
+            inv: Invocation {
+                subcommand: Subcommand::Diff,
+                args: vec!["HEAD".into()],
+                ignored: Vec::new(),
+                want_untracked: true,
+                open_browser: false,
+            },
+        }
+    }
+}

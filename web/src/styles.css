@@ -556,6 +556,92 @@ body {
   white-space: pre-wrap;
 }
 
+/* ---------- commit graph ----------------------------------------------- */
+
+.commit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px 0 0;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--ink-mid);
+  cursor: pointer;
+  font-family: var(--mono);
+}
+/* The aggregate row has no lane column, so it needs the indent itself. */
+.commit-row > .commit-sub:only-child { padding: 8px 0 8px 14px; }
+.commit-row:hover { background: var(--raised); }
+.commit-row[aria-current="true"] {
+  border-left-color: var(--accent);
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.lanes, .lanes-slot {
+  flex: 0 0 auto;
+  display: block;
+  min-width: 14px;
+}
+.lanes line, .lanes path {
+  stroke: var(--rule-strong);
+  stroke-width: 1.5;
+  fill: none;
+}
+.lanes .dot {
+  fill: var(--raised);
+  stroke: var(--ink-dim);
+  stroke-width: 2;
+}
+.commit-row[aria-current="true"] .lanes .dot { stroke: var(--accent); }
+
+.lanes-slot { position: relative; }
+.pending-dot {
+  position: absolute;
+  top: 15px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px dashed var(--ink-dim);
+}
+
+.commit-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 0;
+}
+.commit-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-meta {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-refs { color: var(--accent); }
+
+.graph-note {
+  margin: 4px 0 0;
+  padding: 10px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  border-top: 1px solid var(--rule);
+}
+
 .keys {
   padding: 10px 14px;
   font-size: 11px;

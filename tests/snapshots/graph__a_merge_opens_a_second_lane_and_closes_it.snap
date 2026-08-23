@@ -1,0 +1,8 @@
+---
+source: tests/graph.rs
+expression: "draw(&[(\"m\", &[\"main1\", \"s1\"]), (\"main1\", &[\"base\"]), (\"s1\", &[\"base\"]),\n(\"base\", &[]),])"
+---
+*_  m -> main1,s1
+* |  main1 -> base
+|_*  s1 -> base
+*  base ->

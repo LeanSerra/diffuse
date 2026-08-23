@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getFiles, getSession, keepAlive } from "./api";
+import { CommitGraph } from "./components/CommitGraph";
 import { FileCard } from "./components/FileCard";
 import { Sidebar } from "./components/Sidebar";
 import type { FileList, Session } from "./types";
@@ -21,6 +22,9 @@ export default function App() {
   const [current, setCurrent] = useState<string | null>(null);
   const [sidebar, setSidebar] = useState(storedSidebar);
   const [nonce, setNonce] = useState(0);
+  /** null = the command diffuse was launched with; otherwise a sha or "worktree". */
+  const [rev, setRev] = useState<string | null>(null);
+  const [graph, setGraph] = useState(false);
 
   const cards = useRef(new Map<string, HTMLElement>());
   const main = useRef<HTMLElement | null>(null);
@@ -43,7 +47,7 @@ export default function App() {
 
   useEffect(() => {
     let live = true;
-    Promise.all([getSession(), getFiles()])
+    Promise.all([getSession(rev), getFiles(rev)])
       .then(([s, f]) => {
         if (!live) return;
         setSession(s);
@@ -53,7 +57,7 @@ export default function App() {
       })
       .catch((e) => live && setError(String(e.message ?? e)));
     return () => { live = false; };
-  }, [nonce]);
+  }, [nonce, rev]);
 
   const paths = useMemo(() => list?.files.map((f) => f.path) ?? [], [list]);
   order.current = paths;
@@ -213,6 +217,14 @@ export default function App() {
     };
   }, []);
 
+  const pick = useCallback((next: string | null) => {
+    setRev(next);
+    setGraph(false);
+    setCurrent(null);
+    pending.current = null;
+    main.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+
   const toggleSidebar = useCallback(() => {
     setSidebar((open) => {
       try {
@@ -231,6 +243,11 @@ export default function App() {
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
       if (e.key === "r") { setNonce((n) => n + 1); return; }
       if (e.key === "b") { toggleSidebar(); return; }
+      if (e.key === "g" && session?.range) {
+        setGraph((v) => !v);
+        setSidebar(true);
+        return;
+      }
       if (e.key !== "j" && e.key !== "k") return;
       e.preventDefault();
       const at = current ? paths.indexOf(current) : -1;
@@ -241,14 +258,18 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, paths, jump, toggleSidebar]);
+  }, [current, paths, jump, toggleSidebar, session]);
 
   const bar = (
     <Bar
       session={session}
       list={list}
       sidebar={sidebar}
+      graph={graph}
+      rev={rev}
       onToggleSidebar={toggleSidebar}
+      onToggleGraph={() => { setGraph((g) => !g); setSidebar(true); }}
+      onBack={() => pick(null)}
       onRefresh={() => setNonce((n) => n + 1)}
     />
   );
@@ -267,7 +288,12 @@ export default function App() {
   return (
     <div className="shell" data-side={sidebar ? "on" : "off"}>
       {bar}
-      {sidebar && <Sidebar files={files} current={current} onPick={jump} />}
+      {sidebar &&
+        (graph ? (
+          <CommitGraph current={rev} onPick={pick} />
+        ) : (
+          <Sidebar files={files} current={current} onPick={jump} />
+        ))}
       <main className="main" ref={main}>
         {session?.commit && (
           <article className="commit">
@@ -296,8 +322,9 @@ export default function App() {
           <div className="stack">
             {files.map((f) => (
               <FileCard
-                key={`${nonce}-${f.path}`}
+                key={`${nonce}-${rev ?? ""}-${f.path}`}
                 entry={f}
+                rev={rev}
                 current={f.path === current}
                 registerRef={registerRef}
                 onCollapse={() => jump(f.path)}
@@ -336,12 +363,16 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 function Bar({
-  session, list, sidebar, onToggleSidebar, onRefresh,
+  session, list, sidebar, graph, rev, onToggleSidebar, onToggleGraph, onBack, onRefresh,
 }: {
   session: Session | null;
   list: FileList | null;
   sidebar: boolean;
+  graph: boolean;
+  rev: string | null;
   onToggleSidebar: () => void;
+  onToggleGraph: () => void;
+  onBack: () => void;
   onRefresh: () => void;
 }) {
   const [verb, ...rest] = (session?.command ?? "git diff").split(" ").slice(1);
@@ -365,6 +396,21 @@ function Bar({
       <span className="command">
         git <b>{verb}</b> {rest.join(" ")}
       </span>
+      {rev && (
+        <button className="refresh" onClick={onBack} title="Back to the whole diff">
+          ← whole diff
+        </button>
+      )}
+      {session?.range && (
+        <button
+          className="refresh"
+          onClick={onToggleGraph}
+          aria-pressed={graph}
+          title="Show the commits this diff is made of (g)"
+        >
+          commits
+        </button>
+      )}
       {list && (
         <span className="bar-stats">
           <span className="add-count">+{list.stats.additions}</span>

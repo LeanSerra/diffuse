@@ -85,3 +85,27 @@ fn covers_the_languages_in_use_here() {
         );
     }
 }
+
+/// The complaints that prompted the palette rework: in C, types and functions
+/// must not share a class, constants need one at all, and operators must not
+/// be painted like keywords.
+#[test]
+fn c_distinguishes_types_functions_constants_and_operators() {
+    let src = "#define MAX 10\nstatic int add(int a, int b) {\n    return a + b;\n}\n";
+    let lines = highlight("a.c", src).unwrap();
+    let class_at = |line: usize, needle: &str| -> Option<String> {
+        let text = src.lines().nth(line)?;
+        let at = text.find(needle)? as usize;
+        let at16 = text[..at].encode_utf16().count();
+        lines[line]
+            .iter()
+            .find(|s| s.start <= at16 && at16 < s.end)
+            .map(|s| s.class.to_string())
+    };
+    let ty = class_at(1, "int").expect("int is classified");
+    let func = class_at(1, "add").expect("add is classified");
+    assert_ne!(ty, func, "a type and a function must not share a class");
+    assert_eq!(class_at(2, "+"), None, "operators are left plain");
+    assert_eq!(class_at(1, "("), None, "punctuation is left plain");
+    assert_eq!(class_at(1, "static").as_deref(), Some("kw"));
+}

@@ -27,25 +27,47 @@ fn syntaxes() -> &'static SyntaxSet {
 }
 
 /// Scopes checked innermost first, so the most specific one wins.
+///
+/// An empty class means "leave it plain": operators and punctuation are
+/// deliberately uncoloured, which is what editors and GitHub do. They still
+/// need rules, or `keyword.operator` would fall through to `keyword` and paint
+/// every `=` and `+` like a keyword.
 fn rules() -> &'static [(Scope, &'static str)] {
     static RULES: OnceLock<Vec<(Scope, &'static str)>> = OnceLock::new();
     RULES.get_or_init(|| {
         [
+            ("keyword.operator", ""),
+            ("punctuation", ""),
             ("constant.numeric", "num"),
-            ("constant.language", "kw"),
+            ("constant.language", "const"),
+            ("constant.other", "const"),
+            ("variable.other.constant", "const"),
+            ("entity.name.constant", "const"),
             ("entity.name.function", "fn"),
+            ("entity.name.macro", "fn"),
             ("support.function", "fn"),
+            ("variable.function", "fn"),
             ("entity.name.type", "typ"),
             ("entity.name.class", "typ"),
             ("entity.name.struct", "typ"),
             ("entity.name.enum", "typ"),
+            ("entity.name.union", "typ"),
+            ("entity.name.trait", "typ"),
+            ("entity.name.namespace", "typ"),
             ("support.type", "typ"),
             ("support.class", "typ"),
-            ("entity.other.attribute-name", "typ"),
+            ("entity.name.tag", "tag"),
+            ("markup.heading", "kw"),
+            ("markup.bold", "kw"),
+            ("markup.italic", "typ"),
+            ("markup.raw", "str"),
+            ("markup.underline.link", "attr"),
+            ("markup.list", ""),
+            ("entity.other.attribute-name", "attr"),
+            ("variable.parameter", ""),
             ("storage", "kw"),
             ("keyword", "kw"),
             ("variable.language", "kw"),
-            ("punctuation", "pun"),
         ]
         .into_iter()
         .filter_map(|(s, c)| Scope::new(s).ok().map(|s| (s, c)))
@@ -53,11 +75,6 @@ fn rules() -> &'static [(Scope, &'static str)] {
     })
 }
 
-/// Comments and strings are containers: the quotes that delimit a string and
-/// the `//` that opens a comment carry a `punctuation` scope of their own, but
-/// reading them as punctuation splits the string into three colours. Anything
-/// anywhere inside a comment or a string takes that colour, except an escape
-/// sequence, which editors do pick out.
 fn classify(stack: &ScopeStack) -> Option<&'static str> {
     static CONTAINERS: OnceLock<(Scope, Scope, Scope)> = OnceLock::new();
     let (comment, string, escape) = CONTAINERS.get_or_init(|| {
@@ -132,7 +149,7 @@ pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
             let visible = piece.trim_end_matches(['\n', '\r']);
             let width = visible.encode_utf16().count();
             if width > 0 {
-                if let Some(class) = classify(&stack) {
+                if let Some(class) = classify(&stack).filter(|c| !c.is_empty()) {
                     match spans.last_mut() {
                         // Adjacent pieces of the same class are one span.
                         Some(last) if last.class == class && last.end == at => {

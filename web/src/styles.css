@@ -24,14 +24,17 @@
   --del-mark: #c02434;
   --del-gutter: #f6ced2;
 
-  --t-kw: #8250df;
+  --t-kw: #cf222e;
   --t-typ: #953800;
-  --t-fn: #6639ba;
+  --t-fn: #8250df;
   --t-str: #0a3069;
   --t-num: #0550ae;
-  --t-com: #6a737d;
-  --t-esc: #953800;
-  --t-pun: #57606a;
+  --t-const: #0550ae;
+  --t-com: #6e7781;
+  --t-esc: #0550ae;
+  --t-tag: #116329;
+  --t-attr: #0550ae;
+  --t-var: #953800;
 
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo,
     Consolas, "DejaVu Sans Mono", monospace;
@@ -65,14 +68,17 @@
 --del-word: #6b232c;
 --del-mark: #f0737f;
 --del-gutter: #421d22;
---t-kw: #d2a8ff;
+--t-kw: #ff7b72;
 --t-typ: #ffa657;
 --t-fn: #d2a8ff;
 --t-str: #a5d6ff;
 --t-num: #79c0ff;
+--t-const: #79c0ff;
 --t-com: #8b949e;
---t-esc: #ffa657;
---t-pun: #9aa2b1;
+--t-esc: #79c0ff;
+--t-tag: #7ee787;
+--t-attr: #79c0ff;
+--t-var: #ffa657;
   }
 }
 
@@ -95,14 +101,17 @@
 --del-word: #6b232c;
 --del-mark: #f0737f;
 --del-gutter: #421d22;
---t-kw: #d2a8ff;
+--t-kw: #ff7b72;
 --t-typ: #ffa657;
 --t-fn: #d2a8ff;
 --t-str: #a5d6ff;
 --t-num: #79c0ff;
+--t-const: #79c0ff;
 --t-com: #8b949e;
---t-esc: #ffa657;
---t-pun: #9aa2b1;
+--t-esc: #79c0ff;
+--t-tag: #7ee787;
+--t-attr: #79c0ff;
+--t-var: #ffa657;
 }
 
 * { box-sizing: border-box; }
@@ -453,9 +462,12 @@ body {
 .t-fn { color: var(--t-fn); }
 .t-str { color: var(--t-str); }
 .t-num { color: var(--t-num); }
-.t-com { color: var(--t-com); font-style: italic; }
+.t-const { color: var(--t-const); }
+.t-com { color: var(--t-com); }
 .t-esc { color: var(--t-esc); }
-.t-pun { color: var(--t-pun); }
+.t-tag { color: var(--t-tag); }
+.t-attr { color: var(--t-attr); }
+.t-var { color: var(--t-var); }
 
 .eof {
   display: block;

@@ -5,10 +5,9 @@ expression: "render(\"a.rs\",\n\"// note\\nfn main() {\\n    let x = 42;\\n    l
 // note
 com····
 fn main() {
-kw fn··pu p
+kw fn··
     let x = 42;
-    kw·   k nup
+    kw·     nu
     let s = "hi";
-    kw·   k str·p
+    kw·     str·
 }
-p

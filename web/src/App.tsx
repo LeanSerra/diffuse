@@ -3,7 +3,7 @@ import { getFiles, getSession, keepAlive } from "./api";
 import { CommitGraph } from "./components/CommitGraph";
 import { FileCard } from "./components/FileCard";
 import { Sidebar } from "./components/Sidebar";
-import type { FileList, Session } from "./types";
+import type { CommitRange, FileList, Session } from "./types";
 
 const SIDEBAR_KEY = "diffuse:sidebar";
 
@@ -23,8 +23,17 @@ export default function App() {
   const [sidebar, setSidebar] = useState(storedSidebar);
   const [nonce, setNonce] = useState(0);
   /** null = the command diffuse was launched with; otherwise a sha or "worktree". */
-  const [rev, setRev] = useState<string | null>(null);
+  const [rev, setRev] = useState<string | null>(
+    () => new URLSearchParams(location.search).get("rev"),
+  );
   const [graph, setGraph] = useState(false);
+  /**
+   * The range belongs to the command diffuse was launched with. Reading it off
+   * the current session would lose it the moment you open a commit, because a
+   * commit view is a `show` and has no range — and then the graph you came from
+   * would have no way back.
+   */
+  const [range, setRange] = useState<CommitRange | null>(null);
 
   const cards = useRef(new Map<string, HTMLElement>());
   const main = useRef<HTMLElement | null>(null);
@@ -52,6 +61,7 @@ export default function App() {
         if (!live) return;
         setSession(s);
         setList(f);
+        if (rev === null) setRange(s.range);
         setError(null);
         setCurrent(f.files[0]?.path ?? null);
       })
@@ -217,13 +227,38 @@ export default function App() {
     };
   }, []);
 
-  const pick = useCallback((next: string | null) => {
+  /** Apply a selection without touching history — used by Back and Forward. */
+  const show = useCallback((next: string | null, withGraph: boolean) => {
     setRev(next);
-    setGraph(false);
+    setGraph(withGraph);
     setCurrent(null);
     pending.current = null;
     main.current?.scrollTo({ top: 0, behavior: "instant" });
   }, []);
+
+  const pick = useCallback(
+    (next: string | null) => {
+      show(next, false);
+      // Each commit you open is a place you can come back from, so the
+      // browser's Back button steps through them instead of leaving diffuse.
+      history.pushState(
+        { rev: next, graph: true },
+        "",
+        next ? `?rev=${encodeURIComponent(next)}` : location.pathname,
+      );
+    },
+    [show],
+  );
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const state = e.state as { rev?: string | null; graph?: boolean } | null;
+      const next = state?.rev ?? new URLSearchParams(location.search).get("rev");
+      show(next ?? null, state?.graph ?? false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [show]);
 
   const toggleSidebar = useCallback(() => {
     setSidebar((open) => {
@@ -243,7 +278,7 @@ export default function App() {
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
       if (e.key === "r") { setNonce((n) => n + 1); return; }
       if (e.key === "b") { toggleSidebar(); return; }
-      if (e.key === "g" && session?.range) {
+      if (e.key === "g" && range) {
         setGraph((v) => !v);
         setSidebar(true);
         return;
@@ -258,7 +293,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, paths, jump, toggleSidebar, session]);
+  }, [current, paths, jump, toggleSidebar, range]);
 
   const bar = (
     <Bar
@@ -267,6 +302,7 @@ export default function App() {
       sidebar={sidebar}
       graph={graph}
       rev={rev}
+      range={range}
       onToggleSidebar={toggleSidebar}
       onToggleGraph={() => { setGraph((g) => !g); setSidebar(true); }}
       onBack={() => pick(null)}
@@ -363,13 +399,14 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 function Bar({
-  session, list, sidebar, graph, rev, onToggleSidebar, onToggleGraph, onBack, onRefresh,
+  session, list, sidebar, graph, rev, range, onToggleSidebar, onToggleGraph, onBack, onRefresh,
 }: {
   session: Session | null;
   list: FileList | null;
   sidebar: boolean;
   graph: boolean;
   rev: string | null;
+  range: CommitRange | null;
   onToggleSidebar: () => void;
   onToggleGraph: () => void;
   onBack: () => void;
@@ -401,7 +438,7 @@ function Bar({
           ← whole diff
         </button>
       )}
-      {session?.range && (
+      {range && (
         <button
           className="refresh"
           onClick={onToggleGraph}

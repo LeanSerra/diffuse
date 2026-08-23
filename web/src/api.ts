@@ -20,7 +20,11 @@ function resolveToken(): string {
     } catch {
       // Storage blocked: the token still works for this page load.
     }
-    history.replaceState(null, "", location.pathname);
+    // Keep everything except the token, so a `?rev=` deep link survives.
+    const rest = new URLSearchParams(location.search);
+    rest.delete("t");
+    const query = rest.toString();
+    history.replaceState(null, "", location.pathname + (query ? `?${query}` : ""));
     return fromUrl;
   }
   try {

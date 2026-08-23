@@ -217,7 +217,14 @@ body {
   padding: 3px 8px;
   cursor: pointer;
 }
-.refresh:hover { color: var(--ink); border-color: var(--ink-dim); }
+.refresh:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-dim); }
+.refresh:disabled { opacity: 0.4; cursor: default; }
+
+/* The two step buttons read as one control. */
+.stepper { display: flex; }
+.stepper .refresh { border-radius: 0; }
+.stepper .refresh:first-child { border-radius: 4px 0 0 4px; }
+.stepper .refresh:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
 
 .add-count { color: var(--add-mark); }
 .del-count { color: var(--del-mark); }

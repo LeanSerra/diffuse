@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { getCommits } from "../api";
 import type { Commit, CommitPage, GraphNode } from "../types";
 
 const LANE = 14;
@@ -28,25 +26,14 @@ function Lanes({ node, width }: { node: GraphNode; width: number }) {
 }
 
 export function CommitGraph({
-  command, current, onPick,
+  command, page, current, onPick,
 }: {
   /** The command diffuse was launched with, shown as the aggregate row. */
   command: string;
+  page: CommitPage | null;
   current: string | null;
   onPick: (rev: string | null) => void;
 }) {
-  const [page, setPage] = useState<CommitPage | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    getCommits()
-      .then((p) => live && setPage(p))
-      .catch((e) => live && setError(String(e.message ?? e)));
-    return () => { live = false; };
-  }, []);
-
-  if (error) return <nav className="side"><p className="note">{error}</p></nav>;
   if (!page) return <nav className="side"><div className="side-head">loading commits</div></nav>;
 
   const width = Math.max(1, ...page.graph.map((g) => g.width));

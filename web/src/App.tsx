@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getFiles, getSession, keepAlive } from "./api";
+import { getCommits, getFiles, getSession, keepAlive } from "./api";
 import { CommitGraph } from "./components/CommitGraph";
 import { FileCard } from "./components/FileCard";
 import { Sidebar } from "./components/Sidebar";
-import type { CommitRange, FileList, Session } from "./types";
+import type { CommitPage, CommitRange, FileList, Session } from "./types";
 
 const SIDEBAR_KEY = "diffuse:sidebar";
 
@@ -34,6 +34,7 @@ export default function App() {
    * would have no way back.
    */
   const [range, setRange] = useState<CommitRange | null>(null);
+  const [page, setPage] = useState<CommitPage | null>(null);
 
   const cards = useRef(new Map<string, HTMLElement>());
   const main = useRef<HTMLElement | null>(null);
@@ -68,6 +69,25 @@ export default function App() {
       .catch((e) => live && setError(String(e.message ?? e)));
     return () => { live = false; };
   }, [nonce, rev]);
+
+  useEffect(() => {
+    if (!range) return;
+    let live = true;
+    getCommits()
+      .then((p) => live && setPage(p))
+      .catch(() => {});
+    return () => { live = false; };
+  }, [range, nonce]);
+
+  /**
+   * What the older/newer buttons step through: the uncommitted entry, if there
+   * is one, then the commits in the order the graph draws them.
+   */
+  const walk = useMemo(() => {
+    if (!page) return [] as string[];
+    const revs = page.commits.map((c) => c.sha);
+    return page.range?.uncommitted ? ["worktree", ...revs] : revs;
+  }, [page]);
 
   const paths = useMemo(() => list?.files.map((f) => f.path) ?? [], [list]);
   order.current = paths;
@@ -260,6 +280,17 @@ export default function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, [show]);
 
+  /** Negative goes up the list (newer), positive goes down (older). */
+  const step = useCallback(
+    (delta: number) => {
+      const at = rev ? walk.indexOf(rev) : -1;
+      if (at === -1) return;
+      const next = walk[at + delta];
+      if (next) pick(next);
+    },
+    [rev, walk, pick],
+  );
+
   const toggleSidebar = useCallback(() => {
     setSidebar((open) => {
       try {
@@ -278,6 +309,8 @@ export default function App() {
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
       if (e.key === "r") { setNonce((n) => n + 1); return; }
       if (e.key === "b") { toggleSidebar(); return; }
+      if (e.key === "[") { step(-1); return; }
+      if (e.key === "]") { step(1); return; }
       if (e.key === "g" && range) {
         setGraph((v) => !v);
         setSidebar(true);
@@ -293,7 +326,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, paths, jump, toggleSidebar, range]);
+  }, [current, paths, jump, toggleSidebar, range, step]);
 
   const bar = (
     <Bar
@@ -303,6 +336,9 @@ export default function App() {
       graph={graph}
       rev={rev}
       range={range}
+      walkAt={rev ? walk.indexOf(rev) : -1}
+      walkLength={walk.length}
+      onStep={step}
       onToggleSidebar={toggleSidebar}
       onToggleGraph={() => { setGraph((g) => !g); setSidebar(true); }}
       onBack={() => pick(null)}
@@ -326,7 +362,12 @@ export default function App() {
       {bar}
       {sidebar &&
         (graph ? (
-          <CommitGraph command={session?.command ?? "the diff"} current={rev} onPick={pick} />
+          <CommitGraph
+            command={session?.command ?? "the diff"}
+            page={page}
+            current={rev}
+            onPick={pick}
+          />
         ) : (
           <Sidebar files={files} current={current} onPick={jump} />
         ))}
@@ -399,7 +440,7 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 function Bar({
-  session, list, sidebar, graph, rev, range, onToggleSidebar, onToggleGraph, onBack, onRefresh,
+  session, list, sidebar, graph, rev, range, walkAt, walkLength, onStep, onToggleSidebar, onToggleGraph, onBack, onRefresh,
 }: {
   session: Session | null;
   list: FileList | null;
@@ -407,6 +448,9 @@ function Bar({
   graph: boolean;
   rev: string | null;
   range: CommitRange | null;
+  walkAt: number;
+  walkLength: number;
+  onStep: (delta: number) => void;
   onToggleSidebar: () => void;
   onToggleGraph: () => void;
   onBack: () => void;
@@ -437,6 +481,26 @@ function Bar({
         <button className="refresh" onClick={onBack} title="Back to the whole diff">
           ← whole diff
         </button>
+      )}
+      {walkAt !== -1 && (
+        <span className="stepper">
+          <button
+            className="refresh"
+            onClick={() => onStep(-1)}
+            disabled={walkAt === 0}
+            title="The commit above this one in the graph ([)"
+          >
+            ↑ newer
+          </button>
+          <button
+            className="refresh"
+            onClick={() => onStep(1)}
+            disabled={walkAt >= walkLength - 1}
+            title="The commit below this one in the graph (])"
+          >
+            older ↓
+          </button>
+        </span>
       )}
       {range && (
         <button

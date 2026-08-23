@@ -28,8 +28,10 @@ function Lanes({ node, width }: { node: GraphNode; width: number }) {
 }
 
 export function CommitGraph({
-  current, onPick,
+  command, current, onPick,
 }: {
+  /** The command diffuse was launched with, shown as the aggregate row. */
+  command: string;
   current: string | null;
   onPick: (rev: string | null) => void;
 }) {
@@ -55,12 +57,22 @@ export function CommitGraph({
         {page.commits.length} {page.commits.length === 1 ? "commit" : "commits"}
       </div>
 
+      {/* Naming this row after the command makes it obvious what going back
+          means: it is the same thing the header says diffuse ran. */}
       <button
-        className="commit-row"
+        className="commit-row aggregate"
         aria-current={current === null}
         onClick={() => onPick(null)}
+        title={`Show ${command} again, as a single diff`}
       >
-        <span className="commit-sub">Everything, as one diff</span>
+        <span className="commit-text">
+          <span className="commit-sub">{command}</span>
+          <span className="commit-meta">
+            all {page.commits.length}{" "}
+            {page.commits.length === 1 ? "commit" : "commits"}
+            {page.range?.uncommitted ? " and uncommitted work" : ""}, combined
+          </span>
+        </span>
       </button>
 
       {page.range?.uncommitted && (

@@ -290,7 +290,7 @@ export default function App() {
       {bar}
       {sidebar &&
         (graph ? (
-          <CommitGraph current={rev} onPick={pick} />
+          <CommitGraph command={session?.command ?? "the diff"} current={rev} onPick={pick} />
         ) : (
           <Sidebar files={files} current={current} onPick={jump} />
         ))}

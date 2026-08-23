@@ -23,7 +23,8 @@
 diffuse is not a git client. Its command line **is** git's: take any
 diff-producing `git` command, replace `git` with `diffuse`, and read the result
 in a browser instead of a terminal. It opens a tab, renders the patch, and exits
-when you close it.
+when you close it. Quit it from the terminal instead and the tab says so rather
+than going stale.
 
 ```sh
 diffuse                      # git diff

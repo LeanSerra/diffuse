@@ -27,6 +27,7 @@ export default function App() {
     () => new URLSearchParams(location.search).get("rev"),
   );
   const [graph, setGraph] = useState(false);
+  const [gone, setGone] = useState(false);
   /**
    * The range belongs to the command diffuse was launched with. Reading it off
    * the current session would lose it the moment you open a commit, because a
@@ -48,11 +49,38 @@ export default function App() {
   const pending = useRef<{ path: string; deadline: number } | null>(null);
   const settling = useRef(0);
 
-  // The open stream is what keeps the diffuse process alive. Close the tab and
-  // the command finishes.
+  /**
+   * The open stream is what keeps the diffuse process alive: close the tab and
+   * the command finishes. It also runs the other way — when the process exits
+   * the stream dies, and the page says so instead of sitting there looking live
+   * while every button silently fails.
+   *
+   * Closing the tab outright is attempted but cannot be relied on: browsers
+   * only allow `window.close()` on tabs a script opened, and this one was
+   * opened by the system.
+   */
   useEffect(() => {
     const es = keepAlive();
-    return () => es.close();
+    let dying: number | undefined;
+    const cancel = () => {
+      window.clearTimeout(dying);
+      dying = undefined;
+    };
+    es.onopen = cancel;
+    es.onerror = () => {
+      // EventSource reconnects on its own, so only a failure that persists
+      // means diffuse is actually gone.
+      if (dying !== undefined) return;
+      dying = window.setTimeout(() => {
+        es.close();
+        setGone(true);
+        window.close();
+      }, 2500);
+    };
+    return () => {
+      cancel();
+      es.close();
+    };
   }, []);
 
   useEffect(() => {
@@ -345,6 +373,22 @@ export default function App() {
       onRefresh={() => setNonce((n) => n + 1)}
     />
   );
+
+  if (gone) {
+    return (
+      <div className="shell" data-side="off">
+        {bar}
+        <main className="main" ref={main}>
+          <p className="empty">
+            <span className="mark">▚</span>
+            diffuse has exited.
+            <br />
+            Nothing here will update. This tab is safe to close.
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   if (error) {
     return (

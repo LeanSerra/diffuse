@@ -406,12 +406,7 @@ export default function App() {
       {bar}
       {sidebar &&
         (graph ? (
-          <CommitGraph
-            command={session?.command ?? "the diff"}
-            page={page}
-            current={rev}
-            onPick={pick}
-          />
+          <CommitGraph page={page} current={rev} onPick={pick} />
         ) : (
           <Sidebar files={files} current={current} onPick={jump} />
         ))}
@@ -521,9 +516,16 @@ function Bar({
       <span className="command">
         git <b>{verb}</b> {rest.join(" ")}
       </span>
-      {rev && (
-        <button className="refresh" onClick={onBack} title="Back to the whole diff">
-          ← whole diff
+      {/* Opening a commit narrows the branch diff to that one commit, so the
+          way out is to clear it — and it is only offered when there is a whole
+          branch diff to go back to. */}
+      {rev && range && (
+        <button
+          className="refresh clear"
+          onClick={onBack}
+          title={`Clear this commit and show ${session?.command ?? "the whole diff"} again`}
+        >
+          ✕ clear filter
         </button>
       )}
       {walkAt !== -1 && (

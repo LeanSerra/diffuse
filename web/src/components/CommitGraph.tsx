@@ -26,10 +26,8 @@ function Lanes({ node, width }: { node: GraphNode; width: number }) {
 }
 
 export function CommitGraph({
-  command, page, current, onPick,
+  page, current, onPick,
 }: {
-  /** The command diffuse was launched with, shown as the aggregate row. */
-  command: string;
   page: CommitPage | null;
   current: string | null;
   onPick: (rev: string | null) => void;
@@ -43,24 +41,6 @@ export function CommitGraph({
       <div className="side-head">
         {page.commits.length} {page.commits.length === 1 ? "commit" : "commits"}
       </div>
-
-      {/* Naming this row after the command makes it obvious what going back
-          means: it is the same thing the header says diffuse ran. */}
-      <button
-        className="commit-row aggregate"
-        aria-current={current === null}
-        onClick={() => onPick(null)}
-        title={`Show ${command} again, as a single diff`}
-      >
-        <span className="commit-text">
-          <span className="commit-sub">{command}</span>
-          <span className="commit-meta">
-            all {page.commits.length}{" "}
-            {page.commits.length === 1 ? "commit" : "commits"}
-            {page.range?.uncommitted ? " and uncommitted work" : ""}, combined
-          </span>
-        </span>
-      </button>
 
       {page.range?.uncommitted && (
         <button
@@ -104,7 +84,7 @@ export function CommitGraph({
             {page.range.behind === 1 ? "commit" : "commits"} this branch does not.
           </p>
           <p>
-            {command} compares against its <em>tip</em>, so{" "}
+            Comparing against its <em>tip</em> means{" "}
             {page.range.behind === 1 ? "that commit shows" : "those commits show"}{" "}
             up in the diff as deletions — this branch simply does not have{" "}
             {page.range.behind === 1 ? "it" : "them"} yet. The commits below are

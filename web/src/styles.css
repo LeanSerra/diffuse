@@ -580,8 +580,8 @@ body {
   font-family: var(--mono);
 }
 /* The aggregate row has no lane column, so it needs the indent itself. */
-.commit-row.aggregate { padding-left: 14px; border-bottom: 1px solid var(--rule); }
-.commit-row.aggregate .commit-sub { font-family: var(--mono); }
+.refresh.clear { color: var(--accent); border-color: var(--accent-soft); }
+.refresh.clear:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
 .commit-row:hover { background: var(--raised); }
 .commit-row[aria-current="true"] {
   border-left-color: var(--accent);

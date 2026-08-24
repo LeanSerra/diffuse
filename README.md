@@ -15,6 +15,9 @@
   <a href="https://github.com/LeanSerra/diffuse/releases/latest">
     <img alt="Latest release" src="https://img.shields.io/github/v/release/LeanSerra/diffuse?style=flat-square&label=%F0%9F%9A%80%20Release">
   </a>
+  <a href="https://github.com/LeanSerra/diffuse/actions/workflows/ci.yml">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/LeanSerra/diffuse/ci.yml?branch=main&style=flat-square&label=%E2%9C%93%20CI">
+  </a>
   <a href="LICENSE">
     <img alt="License" src="https://img.shields.io/badge/%F0%9F%93%9C%20License-MIT-blue?style=flat-square">
   </a>
@@ -49,7 +52,9 @@ diffuse show <commit>        # git show <commit>
 
 ## Install
 
-The UI is compiled into the binary, so it has to be built once first:
+Prebuilt binaries for Linux, macOS and Windows are attached to each
+[release](https://github.com/LeanSerra/diffuse/releases). To build from source
+instead, note the UI is compiled into the binary and has to be built once first:
 
 ```sh
 cd web && pnpm install && pnpm build && cd ..

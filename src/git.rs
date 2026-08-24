@@ -138,10 +138,7 @@ impl Runner {
     /// Split the user's arguments at `--` into (revisions and flags, pathspecs).
     fn split_pathspec(&self) -> (Vec<String>, Vec<String>) {
         match self.inv.args.iter().position(|a| a == "--") {
-            Some(i) => (
-                self.inv.args[..i].to_vec(),
-                self.inv.args[i + 1..].to_vec(),
-            ),
+            Some(i) => (self.inv.args[..i].to_vec(), self.inv.args[i + 1..].to_vec()),
             None => (self.inv.args.clone(), Vec::new()),
         }
     }
@@ -394,13 +391,15 @@ impl Runner {
         let date = parts.next().unwrap_or_default().to_string();
         let subject = parts.next().unwrap_or_default().to_string();
         let body = parts.next().unwrap_or_default().trim_end().to_string();
-        let merge = parts
-            .next()
-            .unwrap_or_default()
-            .split_whitespace()
-            .count()
-            > 1;
-        Some(CommitMeta { sha, author, date, subject, body, merge })
+        let merge = parts.next().unwrap_or_default().split_whitespace().count() > 1;
+        Some(CommitMeta {
+            sha,
+            author,
+            date,
+            subject,
+            body,
+            merge,
+        })
     }
 
     /// Whether the right-hand side of this comparison is the working tree.
@@ -410,10 +409,7 @@ impl Runner {
             return false;
         }
         let (head, _) = self.split_pathspec();
-        if head
-            .iter()
-            .any(|a| a == "--cached" || a == "--staged")
-        {
+        if head.iter().any(|a| a == "--cached" || a == "--staged") {
             return false;
         }
         let mut revs = 0;
@@ -423,7 +419,12 @@ impl Runner {
                 return false;
             }
             if self
-                .plumbing(&["rev-parse", "--verify", "--quiet", &format!("{arg}^{{commit}}")])
+                .plumbing(&[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    &format!("{arg}^{{commit}}"),
+                ])
                 .is_some()
             {
                 revs += 1;
@@ -523,7 +524,6 @@ impl Runner {
     }
 }
 
-
 /// Classify an untracked file and count its lines without loading it.
 ///
 /// git decides "binary" from the first few kilobytes, and so do we: an
@@ -568,7 +568,11 @@ fn measure_untracked(path: &Path) -> Option<(u32, bool)> {
         reader.consume(n);
     }
     // A final line without a trailing newline still counts as a line.
-    let unterminated = if saw_more { !tail_ends_with_newline } else { !ended_with_newline };
+    let unterminated = if saw_more {
+        !tail_ends_with_newline
+    } else {
+        !ended_with_newline
+    };
     if unterminated {
         lines += 1;
     }
@@ -621,7 +625,12 @@ impl Runner {
             .filter(|a| {
                 a.contains("..")
                     || self
-                        .plumbing(&["rev-parse", "--verify", "--quiet", &format!("{a}^{{commit}}")])
+                        .plumbing(&[
+                            "rev-parse",
+                            "--verify",
+                            "--quiet",
+                            &format!("{a}^{{commit}}"),
+                        ])
                         .is_some()
             })
             .cloned()
@@ -660,7 +669,11 @@ impl Runner {
         Some(CommitRange {
             spec: format!("{base}..{head}"),
             behind,
-            other: if behind > 0 { revs.first().cloned() } else { None },
+            other: if behind > 0 {
+                revs.first().cloned()
+            } else {
+                None
+            },
             uncommitted: self.worktree_is_right_side() && self.is_dirty(),
         })
     }
@@ -702,11 +715,7 @@ impl Runner {
                 Some(Commit {
                     sha: f.next()?.to_string(),
                     short: f.next()?.to_string(),
-                    parents: f
-                        .next()?
-                        .split_whitespace()
-                        .map(str::to_string)
-                        .collect(),
+                    parents: f.next()?.split_whitespace().map(str::to_string).collect(),
                     author: f.next()?.to_string(),
                     date: f.next()?.to_string(),
                     subject: f.next()?.to_string(),

@@ -109,11 +109,7 @@ struct FileQuery {
     t: Option<String>,
 }
 
-async fn session(
-    State(app): State<App>,
-    headers: HeaderMap,
-    Query(q): Query<Auth>,
-) -> Response {
+async fn session(State(app): State<App>, headers: HeaderMap, Query(q): Query<Auth>) -> Response {
     if !authorized(&app, &headers, q.t.as_deref()) {
         return unauthorized();
     }
@@ -141,7 +137,10 @@ async fn files(State(app): State<App>, headers: HeaderMap, Query(q): Query<Auth>
         return unauthorized();
     }
     let r = runner_for(&app, q.rev.as_deref());
-    match tokio::task::spawn_blocking(move || r.file_list()).await.unwrap() {
+    match tokio::task::spawn_blocking(move || r.file_list())
+        .await
+        .unwrap()
+    {
         Ok(files) => {
             let additions: u32 = files.iter().map(|f| f.additions).sum();
             let deletions: u32 = files.iter().map(|f| f.deletions).sum();
@@ -264,11 +263,7 @@ async fn commits(
 
 /// Holding this stream open is what keeps diffuse alive; closing the tab is
 /// how you quit it.
-async fn events(
-    State(app): State<App>,
-    headers: HeaderMap,
-    Query(q): Query<Auth>,
-) -> Response {
+async fn events(State(app): State<App>, headers: HeaderMap, Query(q): Query<Auth>) -> Response {
     if !authorized(&app, &headers, q.t.as_deref()) {
         return unauthorized();
     }
@@ -276,12 +271,11 @@ async fn events(
     app.ever_connected.fetch_add(1, Ordering::SeqCst);
     let guard = ClientGuard(app.clients.clone());
 
-    let stream = IntervalStream::new(tokio::time::interval(Duration::from_secs(5))).map(
-        move |_| {
+    let stream =
+        IntervalStream::new(tokio::time::interval(Duration::from_secs(5))).map(move |_| {
             let _hold = &guard;
             Ok::<_, Infallible>(Event::default().event("ping").data("1"))
-        },
-    );
+        });
     Sse::new(stream).into_response()
 }
 
@@ -298,7 +292,11 @@ async fn asset(uri: Uri) -> Response {
     match Assets::get(path).or_else(|| Assets::get("index.html")) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            ([(header::CONTENT_TYPE, mime.as_ref())], content.data.into_owned()).into_response()
+            (
+                [(header::CONTENT_TYPE, mime.as_ref())],
+                content.data.into_owned(),
+            )
+                .into_response()
         }
         None => (StatusCode::NOT_FOUND, "not found").into_response(),
     }
@@ -331,7 +329,8 @@ pub async fn serve(runner: Runner, dev: bool) -> std::io::Result<Serving> {
         .with_state(app.clone());
 
     let port = if dev { 5177 } else { 0 };
-    let listener = tokio::net::TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, port))).await?;
+    let listener =
+        tokio::net::TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, port))).await?;
     let addr = listener.local_addr()?;
 
     tokio::spawn(async move {
@@ -348,8 +347,12 @@ pub async fn serve(runner: Runner, dev: bool) -> std::io::Result<Serving> {
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 if std::env::var("DIFFUSE_TRACE").is_ok() {
-                    eprintln!("idle-tick clients={} ever={} idle={:?}",
-                        clients.load(Ordering::SeqCst), ever.load(Ordering::SeqCst), idle);
+                    eprintln!(
+                        "idle-tick clients={} ever={} idle={:?}",
+                        clients.load(Ordering::SeqCst),
+                        ever.load(Ordering::SeqCst),
+                        idle
+                    );
                 }
                 if clients.load(Ordering::SeqCst) == 0 && ever.load(Ordering::SeqCst) > 0 {
                     idle += Duration::from_secs(1);

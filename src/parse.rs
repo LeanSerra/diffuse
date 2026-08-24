@@ -105,10 +105,7 @@ fn split_git_header(rest: &str) -> Option<(String, String)> {
     // midpoint guess so the file still renders.
     let half = rest.len() / 2;
     if rest.as_bytes().get(half) == Some(&b' ') {
-        return Some((
-            strip_prefix(&rest[..half]),
-            strip_prefix(&rest[half + 1..]),
-        ));
+        return Some((strip_prefix(&rest[..half]), strip_prefix(&rest[half + 1..])));
     }
     None
 }
@@ -344,7 +341,7 @@ pub fn parse_patch(text: &str) -> Vec<FileDiff> {
             content,
             no_newline: false,
             words: None,
-                syntax: None,
+            syntax: None,
         });
     }
 

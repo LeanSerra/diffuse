@@ -155,7 +155,11 @@ pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
                         Some(last) if last.class == class && last.end == at => {
                             last.end = at + width;
                         }
-                        _ => spans.push(Span { start: at, end: at + width, class }),
+                        _ => spans.push(Span {
+                            start: at,
+                            end: at + width,
+                            class,
+                        }),
                     }
                 }
             }
@@ -172,11 +176,7 @@ pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
 /// text, so both sides of a change are coloured from a file that actually
 /// parses. Combined diffs are skipped: their removals belong to different
 /// parents, so there is no single old file to read them from.
-pub fn annotate(
-    file: &mut crate::model::FileDiff,
-    old_text: Option<&str>,
-    new_text: Option<&str>,
-) {
+pub fn annotate(file: &mut crate::model::FileDiff, old_text: Option<&str>, new_text: Option<&str>) {
     use crate::model::LineKind;
 
     if file.binary || file.combined {

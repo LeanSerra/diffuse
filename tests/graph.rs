@@ -4,8 +4,7 @@
 use diffuse::graph::lay_out;
 
 fn draw(spec: &[(&str, &[&str])]) -> String {
-    let commits: Vec<(&str, Vec<&str>)> =
-        spec.iter().map(|(s, p)| (*s, p.to_vec())).collect();
+    let commits: Vec<(&str, Vec<&str>)> = spec.iter().map(|(s, p)| (*s, p.to_vec())).collect();
     let nodes = lay_out(&commits);
     let width = nodes.iter().map(|n| n.width).max().unwrap_or(1);
     let mut out = String::new();
@@ -75,7 +74,10 @@ fn lanes_all_close_by_the_root() {
     ];
     let nodes = lay_out(&spec);
     let last = nodes.last().unwrap();
-    assert!(last.through.is_empty(), "no lane may outlive the root: {last:?}");
+    assert!(
+        last.through.is_empty(),
+        "no lane may outlive the root: {last:?}"
+    );
     assert!(last.edges.is_empty(), "the root has no parents to point at");
 }
 

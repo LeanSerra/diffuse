@@ -103,10 +103,16 @@ pub fn lay_out<S: AsRef<str>>(commits: &[(S, Vec<S>)]) -> Vec<Node> {
             lanes.pop();
         }
 
-        let width = lanes.len().max(lane + 1).max(
-            edges.iter().map(|(a, b)| a.max(b) + 1).max().unwrap_or(0),
-        );
-        out.push(Node { lane, edges, through, width });
+        let width = lanes
+            .len()
+            .max(lane + 1)
+            .max(edges.iter().map(|(a, b)| a.max(b) + 1).max().unwrap_or(0));
+        out.push(Node {
+            lane,
+            edges,
+            through,
+            width,
+        });
     }
     out
 }

@@ -55,8 +55,16 @@ fn line_numbers_track_hunk_headers() {
     for name in ["01-modify.patch", "02-hunks-section.patch", "12-crlf.patch"] {
         for file in parse_patch(&fixture(name)) {
             for hunk in &file.hunks {
-                let olds = hunk.lines.iter().filter_map(|l| l.old_no).collect::<Vec<_>>();
-                let news = hunk.lines.iter().filter_map(|l| l.new_no).collect::<Vec<_>>();
+                let olds = hunk
+                    .lines
+                    .iter()
+                    .filter_map(|l| l.old_no)
+                    .collect::<Vec<_>>();
+                let news = hunk
+                    .lines
+                    .iter()
+                    .filter_map(|l| l.new_no)
+                    .collect::<Vec<_>>();
                 if let Some(&first) = olds.first() {
                     assert_eq!(first, hunk.old_start, "{name}: old start");
                 }
@@ -86,7 +94,10 @@ fn combined_diff_omits_old_numbers_and_numbers_the_result() {
     let mut expected = None;
     for hunk in &file.hunks {
         for line in &hunk.lines {
-            assert!(line.old_no.is_none(), "combined diff must not guess old numbers");
+            assert!(
+                line.old_no.is_none(),
+                "combined diff must not guess old numbers"
+            );
         }
         let news: Vec<u32> = hunk.lines.iter().filter_map(|l| l.new_no).collect();
         let start = *expected.get_or_insert(hunk.new_start);

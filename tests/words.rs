@@ -39,7 +39,10 @@ fn render(patch: &str) -> String {
 }
 
 fn patch(body: &str) -> String {
-    format!("diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,{n} +1,{n} @@\n{body}", n = body.lines().count())
+    format!(
+        "diff --git a/f b/f\n--- a/f\n+++ b/f\n@@ -1,{n} +1,{n} @@\n{body}",
+        n = body.lines().count()
+    )
 }
 
 #[test]
@@ -51,9 +54,7 @@ fn highlights_only_the_changed_word() {
 
 #[test]
 fn handles_insertion_and_deletion_within_a_line() {
-    insta::assert_snapshot!(render(&patch(
-        "-fn run(a, c)\n+fn run(a, b, c)\n"
-    )));
+    insta::assert_snapshot!(render(&patch("-fn run(a, c)\n+fn run(a, b, c)\n")));
 }
 
 #[test]

@@ -12,7 +12,12 @@ fn render(path: &str, source: &str) -> String {
         let units = text.encode_utf16().count();
         let mut bar = vec![' '; units];
         for s in spans {
-            for (i, slot) in bar.iter_mut().enumerate().take(s.end.min(units)).skip(s.start) {
+            for (i, slot) in bar
+                .iter_mut()
+                .enumerate()
+                .take(s.end.min(units))
+                .skip(s.start)
+            {
                 *slot = s.class.chars().nth(i - s.start).unwrap_or('·');
             }
         }
@@ -43,7 +48,8 @@ fn a_line_inside_a_block_comment_is_still_a_comment() {
     );
     assert!(
         lines[3].iter().any(|s| s.class == "kw"),
-        "line 4 is back in code, got {:?}", lines[3],
+        "line 4 is back in code, got {:?}",
+        lines[3],
     );
 }
 
@@ -53,9 +59,15 @@ fn offsets_are_utf16() {
     let lines = highlight("a.rs", "let s = \"🎉 hi\";\n").unwrap();
     let text = "let s = \"🎉 hi\";";
     let units: Vec<u16> = text.encode_utf16().collect();
-    let string = lines[0].iter().find(|s| s.class == "str").expect("a string span");
+    let string = lines[0]
+        .iter()
+        .find(|s| s.class == "str")
+        .expect("a string span");
     let slice = String::from_utf16_lossy(&units[string.start..string.end]);
-    assert!(slice.starts_with('"') && slice.contains("🎉"), "got {slice:?}");
+    assert!(
+        slice.starts_with('"') && slice.contains("🎉"),
+        "got {slice:?}"
+    );
 }
 
 #[test]

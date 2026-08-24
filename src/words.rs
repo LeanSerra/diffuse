@@ -38,14 +38,26 @@ fn tokenize(s: &str) -> Vec<Token> {
             buf.push(c);
         } else {
             if !buf.is_empty() {
-                out.push(Token { len: at - start, text: std::mem::take(&mut buf), at: start });
+                out.push(Token {
+                    len: at - start,
+                    text: std::mem::take(&mut buf),
+                    at: start,
+                });
             }
-            out.push(Token { text: c.to_string(), at, len: w });
+            out.push(Token {
+                text: c.to_string(),
+                at,
+                len: w,
+            });
         }
         at += w;
     }
     if !buf.is_empty() {
-        out.push(Token { len: at - start, text: buf, at: start });
+        out.push(Token {
+            len: at - start,
+            text: buf,
+            at: start,
+        });
     }
     out
 }
@@ -121,13 +133,19 @@ fn changed_ranges(old: &str, new: &str) -> Option<(Vec<Range>, Vec<Range>)> {
         .iter()
         .zip(&fa)
         .filter(|(_, c)| **c)
-        .map(|(t, _)| Range { start: t.at, end: t.at + t.len })
+        .map(|(t, _)| Range {
+            start: t.at,
+            end: t.at + t.len,
+        })
         .collect();
     let rb: Vec<Range> = mb
         .iter()
         .zip(&fb)
         .filter(|(_, c)| **c)
-        .map(|(t, _)| Range { start: t.at, end: t.at + t.len })
+        .map(|(t, _)| Range {
+            start: t.at,
+            end: t.at + t.len,
+        })
         .collect();
 
     // A near-total rewrite is better shown as a plain replacement.
@@ -158,10 +176,11 @@ pub fn annotate(hunks: &mut [Hunk]) {
                 .iter()
                 .take_while(|l| l.kind == LineKind::Del)
                 .count();
-            let adds = dels + lines[dels..]
-                .iter()
-                .take_while(|l| l.kind == LineKind::Add)
-                .count();
+            let adds = dels
+                + lines[dels..]
+                    .iter()
+                    .take_while(|l| l.kind == LineKind::Add)
+                    .count();
             let (dn, an) = (dels - i, adds - dels);
             if dn == an && dn > 0 {
                 for k in 0..dn {

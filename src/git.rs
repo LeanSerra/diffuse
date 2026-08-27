@@ -87,6 +87,35 @@ pub struct Runner {
     pub inv: Invocation,
 }
 
+/// Rebuild both sides of a file from a full-context diff: every line of the
+/// old file is a deletion or context, every line of the new one an addition or
+/// context. Only meaningful on a `-U1000000` patch.
+fn reconstruct(file: &crate::model::FileDiff) -> (String, String) {
+    let mut old = String::new();
+    let mut new = String::new();
+    for hunk in &file.hunks {
+        for line in &hunk.lines {
+            match line.kind {
+                crate::model::LineKind::Add => {
+                    new.push_str(&line.content);
+                    new.push('\n');
+                }
+                crate::model::LineKind::Del => {
+                    old.push_str(&line.content);
+                    old.push('\n');
+                }
+                crate::model::LineKind::Context => {
+                    old.push_str(&line.content);
+                    old.push('\n');
+                    new.push_str(&line.content);
+                    new.push('\n');
+                }
+            }
+        }
+    }
+    (old, new)
+}
+
 impl Runner {
     pub fn new(repo: Repo, inv: Invocation) -> Self {
         Runner { repo, inv }
@@ -289,6 +318,47 @@ impl Runner {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
 
+    /// The patch for every file the command covers, from a single `git` run.
+    ///
+    /// `patch_for` exists to answer one file at a time; this is the same
+    /// command with the user's own pathspecs left alone. Streaming the whole
+    /// diff costs one process here rather than one per file.
+    pub fn whole_patch(&self) -> Result<String, GitError> {
+        let mut args = self.base();
+        args.extend(self.inv.args.iter().cloned());
+        let out = self.raw(&args)?;
+        if !out.status.success() {
+            return Err(GitError {
+                message: "git command failed".into(),
+                stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+            });
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    }
+
+    /// Complete old and new text for every file, keyed by path.
+    ///
+    /// The whole-diff counterpart of `full_text`. Highlighting needs whole
+    /// files, and one `-U1000000` run yields all of them at once — the
+    /// difference between one `git` process and one per changed file.
+    pub fn whole_full_text(&self) -> std::collections::HashMap<String, (String, String)> {
+        let mut args = self.base();
+        args.push("-U1000000".into());
+        args.extend(self.inv.args.iter().cloned());
+        let Ok(out) = self.raw(&args) else {
+            return Default::default();
+        };
+        if !out.status.success() {
+            return Default::default();
+        }
+        let patch = String::from_utf8_lossy(&out.stdout);
+        crate::parse::parse_patch(&patch)
+            .iter()
+            .filter(|f| !f.binary)
+            .map(|f| (f.path.clone(), reconstruct(f)))
+            .collect()
+    }
+
     /// The same diff with effectively unlimited context, which yields the
     /// complete old and new text of one file. Highlighting needs whole files —
     /// a hunk can open inside a block comment — and taking them from the diff
@@ -316,29 +386,7 @@ impl Runner {
         if file.binary {
             return None;
         }
-        let mut old = String::new();
-        let mut new = String::new();
-        for hunk in &file.hunks {
-            for line in &hunk.lines {
-                match line.kind {
-                    crate::model::LineKind::Add => {
-                        new.push_str(&line.content);
-                        new.push('\n');
-                    }
-                    crate::model::LineKind::Del => {
-                        old.push_str(&line.content);
-                        old.push('\n');
-                    }
-                    crate::model::LineKind::Context => {
-                        old.push_str(&line.content);
-                        old.push('\n');
-                        new.push_str(&line.content);
-                        new.push('\n');
-                    }
-                }
-            }
-        }
-        Some((old, new))
+        Some(reconstruct(file))
     }
 
     pub fn read_untracked(&self, path: &str) -> Result<String, GitError> {
@@ -742,6 +790,7 @@ impl Runner {
                 ignored: Vec::new(),
                 want_untracked: false,
                 open_browser: false,
+                inline_all: self.inv.inline_all,
             },
         }
     }
@@ -756,6 +805,7 @@ impl Runner {
                 ignored: Vec::new(),
                 want_untracked: true,
                 open_browser: false,
+                inline_all: self.inv.inline_all,
             },
         }
     }

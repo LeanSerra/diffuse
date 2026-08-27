@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getFile } from "../api";
 import type { FileDiff, FileEntry } from "../types";
@@ -59,7 +60,7 @@ const CHIP: Partial<Record<FileEntry["status"], string>> = {
 };
 
 export function FileCard({
-  entry, rev, current, registerRef, onCollapse,
+  entry, rev, current, registerRef, onCollapse, preloaded, selfLoad,
 }: {
   entry: FileEntry;
   rev: string | null;
@@ -67,6 +68,10 @@ export function FileCard({
   registerRef: (path: string, el: HTMLElement | null) => void;
   /** Bring this card's header to the top after it collapses. */
   onCollapse: () => void;
+  /** This file's diff from the whole-diff stream, once it has arrived. */
+  preloaded: FileDiff | null;
+  /** The diff was past the server's ceiling: fetch this file on approach. */
+  selfLoad: boolean;
 }) {
   const [diff, setDiff] = useState<FileDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +79,7 @@ export function FileCard({
   const [near, setNear] = useState(false);
   const [copied, setCopied] = useState(false);
   const host = useRef<HTMLElement | null>(null);
+  const body = useRef<HTMLDivElement | null>(null);
   const justToggled = useRef(false);
   const copiedFor = useRef(0);
 
@@ -123,6 +129,29 @@ export function FileCard({
     setOpen((v) => !v);
   }, []);
 
+  /*
+   * `hidden="until-found"` is set on the node rather than rendered, because
+   * React treats `hidden` as a boolean and would write `hidden=""`, which
+   * hides the content outright and puts it back out of find's reach.
+   */
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    if (open) el.removeAttribute("hidden");
+    else el.setAttribute("hidden", "until-found");
+  }, [open]);
+
+  // The browser expands a collapsed card by itself when a search lands inside
+  // it. This is how the chevron finds out, so it never claims the file is
+  // still collapsed while you are reading it.
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const reveal = () => setOpen(true);
+    el.addEventListener("beforematch", reveal as EventListener);
+    return () => el.removeEventListener("beforematch", reveal as EventListener);
+  }, []);
+
   useLayoutEffect(() => {
     if (!justToggled.current) return;
     justToggled.current = false;
@@ -131,32 +160,38 @@ export function FileCard({
     requestAnimationFrame(onCollapse);
   }, [open, onCollapse]);
 
-  // Bodies are fetched as the card approaches the viewport, so opening a
-  // 2,000-file diff costs one request, not two thousand.
+  // Only reached past the server's ceiling. Normally every file arrives on
+  // the whole-diff stream, because find-in-page cannot reach text that is not
+  // in the page — a card that waits for you to scroll to it is a card the
+  // browser's own search will never see.
   useEffect(() => {
     const el = host.current;
-    if (!el || near) return;
+    if (!el || near || !selfLoad) return;
     const io = new IntersectionObserver(
       (entries) => entries.some((e) => e.isIntersecting) && setNear(true),
       { rootMargin: "600px 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [near]);
+  }, [near, selfLoad]);
 
   useEffect(() => {
-    if (!near || diff || error) return;
+    if (!near || !selfLoad || diff || error) return;
     let live = true;
     getFile(entry, rev)
       .then((d) => live && setDiff(d))
       .catch((e) => live && setError(String(e.message ?? e)));
     return () => { live = false; };
-  }, [near, diff, error, entry, rev]);
+  }, [near, selfLoad, diff, error, entry, rev]);
 
   const force = () => {
     setDiff(null);
     getFile(entry, rev, true).then(setDiff).catch((e) => setError(String(e.message ?? e)));
   };
+
+  // The streamed copy is authoritative; `diff` only ever holds a file this
+  // card fetched itself, which happens past the ceiling or on a forced reload.
+  const shown = diff ?? preloaded;
 
   const { dir, base } = splitPath(entry.path);
   const chip = CHIP[entry.status];
@@ -200,15 +235,24 @@ export function FileCard({
         <span className="del-count">−{entry.deletions}</span>
       </header>
 
-      {open && (
-        <>
-          {error && <p className="note">{error}</p>}
-          {!error && !diff && (
-            <div className="skeleton" style={{ height: estimateHeight(entry) }} />
-          )}
-          {!error && diff && <DiffBody diff={diff} onForce={force} />}
-        </>
-      )}
+      {/*
+        Collapsed content stays in the DOM, hidden, rather than being unmounted:
+        `until-found` lets the browser reveal it when a search lands inside, so
+        collapsing a file does not put it out of reach of Ctrl+F.
+      */}
+      <div
+        ref={body}
+        className="card-body"
+        // Feeds `contain-intrinsic-size`, so a card the browser has not laid
+        // out yet still takes up roughly the room it eventually will.
+        style={{ "--est": `${estimateHeight(entry)}px` } as CSSProperties}
+      >
+        {error && <p className="note">{error}</p>}
+        {!error && !shown && (
+          <div className="skeleton" style={{ height: estimateHeight(entry) }} />
+        )}
+        {!error && shown && <DiffBody diff={shown} onForce={force} />}
+      </div>
     </section>
   );
 }

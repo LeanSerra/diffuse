@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getCommits, getFiles, getSession, keepAlive } from "./api";
+import { getCommits, getFiles, getSession, keepAlive, streamAll } from "./api";
 import { CommitGraph } from "./components/CommitGraph";
 import { FileCard } from "./components/FileCard";
 import { Sidebar } from "./components/Sidebar";
-import type { CommitPage, CommitRange, FileList, Session } from "./types";
+import type { CommitPage, CommitRange, FileDiff, FileList, Session } from "./types";
 
 const SIDEBAR_KEY = "diffuse:sidebar";
+
+/** What the whole-diff stream reported, or null before it answers. */
+type StreamState = {
+  inline: boolean;
+  total: number;
+  done: boolean;
+  lines: number;
+  cap: number;
+} | null;
 
 function storedSidebar() {
   try {
@@ -36,6 +45,16 @@ export default function App() {
    */
   const [range, setRange] = useState<CommitRange | null>(null);
   const [page, setPage] = useState<CommitPage | null>(null);
+  /**
+   * Every file's diff, held here rather than fetched by each card.
+   *
+   * The point is the browser's own find: Ctrl+F can only reach a file whose
+   * text is in the page, so the whole diff is streamed in up front and the
+   * cards render from this. `inline` false means the diff was past the
+   * server's ceiling and the cards go back to loading themselves.
+   */
+  const [diffs, setDiffs] = useState<Map<string, FileDiff>>(() => new Map());
+  const [stream, setStream] = useState<StreamState>(null);
 
   const cards = useRef(new Map<string, HTMLElement>());
   const main = useRef<HTMLElement | null>(null);
@@ -96,6 +115,31 @@ export default function App() {
       })
       .catch((e) => live && setError(String(e.message ?? e)));
     return () => { live = false; };
+  }, [nonce, rev]);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    setDiffs(new Map());
+    setStream(null);
+    streamAll(
+      rev,
+      {
+        begin: (b) =>
+          setStream({ inline: b.inline, total: b.files, done: !b.inline, lines: b.lines, cap: b.cap }),
+        // A new Map per record so React sees the change; the cost is one
+        // shallow copy per file, not per line.
+        file: (d) => setDiffs((m) => new Map(m).set(d.path, d)),
+        done: () => setStream((s) => (s ? { ...s, done: true } : s)),
+      },
+      abort.signal,
+    ).catch(() => {
+      // A failed stream is not fatal: the cards fall back to fetching
+      // themselves, exactly as they do past the ceiling.
+      if (!abort.signal.aborted) {
+        setStream({ inline: false, total: 0, done: true, lines: 0, cap: 0 });
+      }
+    });
+    return () => abort.abort();
   }, [nonce, rev]);
 
   useEffect(() => {
@@ -376,6 +420,8 @@ export default function App() {
       graph={graph}
       rev={rev}
       range={range}
+      stream={stream}
+      loaded={diffs.size}
       walkAt={rev ? walk.indexOf(rev) : -1}
       walkLength={walk.length}
       onStep={step}
@@ -456,6 +502,8 @@ export default function App() {
                 current={f.path === current}
                 registerRef={registerRef}
                 onCollapse={() => jump(f.path)}
+                preloaded={diffs.get(f.path) ?? null}
+                selfLoad={stream !== null && !stream.inline}
               />
             ))}
           </div>
@@ -491,10 +539,12 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 function Bar({
-  session, list, sidebar, graph, rev, range, walkAt, walkLength, onStep, onToggleSidebar, onToggleGraph, onBack, onRefresh,
+  session, list, sidebar, graph, rev, range, walkAt, walkLength, stream, loaded, onStep, onToggleSidebar, onToggleGraph, onBack, onRefresh,
 }: {
   session: Session | null;
   list: FileList | null;
+  stream: StreamState;
+  loaded: number;
   sidebar: boolean;
   graph: boolean;
   rev: string | null;
@@ -508,6 +558,8 @@ function Bar({
   onRefresh: () => void;
 }) {
   const [verb, ...rest] = (session?.command ?? "git diff").split(" ").slice(1);
+  const loading = stream !== null && stream.inline && !stream.done;
+  const capped = stream !== null && !stream.inline && stream.lines > 0;
   return (
     <header className="bar">
       <button
@@ -569,6 +621,28 @@ function Bar({
         >
           commits
         </button>
+      )}
+      {/* Loading is worth showing because it bounds something the reader can
+          otherwise only discover by failing: until the stream finishes, the
+          browser's own find cannot reach the files still on their way. */}
+      {loading && (
+        <span className="loading" title="Files still arriving cannot be found with Ctrl+F yet">
+          <span
+            className="loading-fill"
+            style={{ width: `${stream.total ? (loaded / stream.total) * 100 : 0}%` }}
+          />
+          <span className="loading-text">{loaded} / {stream.total} files</span>
+        </span>
+      )}
+      {/* Silence here would be the worst outcome: find-in-page would simply
+          come up short with nothing to explain why. */}
+      {capped && (
+        <span
+          className="capped"
+          title={`Over ${stream.cap.toLocaleString()} changed lines. Relaunch with --inline-all to load it all anyway.`}
+        >
+          {stream.lines.toLocaleString()} lines — too large to search in full
+        </span>
       )}
       {list && (
         <span className="bar-stats">

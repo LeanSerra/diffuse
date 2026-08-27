@@ -183,6 +183,29 @@ body {
 }
 .command b { color: var(--ink); font-weight: 600; }
 
+/* A bar rather than a spinner: what matters is how much is left, because the
+   part still arriving is the part Ctrl+F cannot reach yet. */
+.loading {
+  position: relative;
+  display: flex; align-items: center;
+  min-width: 130px; padding: 2px 8px;
+  border: 1px solid var(--rule); border-radius: 4px;
+  background: var(--ground); overflow: clip;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+}
+.loading-fill {
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--accent-soft);
+  transition: width 120ms linear;
+}
+.loading-text { position: relative; white-space: nowrap; }
+
+.capped {
+  padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--accent); color: var(--accent);
+  font-family: var(--mono); font-size: 11px; white-space: nowrap;
+}
+
 .bar-stats { display: flex; align-items: center; gap: 10px; font-family: var(--mono); }
 .bar-stats .files { color: var(--ink-dim); }
 
@@ -332,6 +355,22 @@ body {
   overflow: clip;
 }
 .card:target, .card[data-current="true"] { border-color: var(--rule-strong); }
+
+/* Every file's rows are in the page at once so the browser's own find can
+   reach them, which would otherwise mean laying out a whole diff's worth of
+   rows. `auto` lets the browser skip that work for cards you cannot see, and
+   — the reason this is usable at all — skipped content is still searchable.
+   `contain-intrinsic-size: auto <estimate>` supplies a height in the meantime
+   and then remembers the real one, so the scrollbar settles after first pass
+   instead of drifting every time a card is rendered. */
+.card-body {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--est, 600px);
+}
+/* `hidden="until-found"` collapses a card by setting `content-visibility:
+   hidden` from the UA stylesheet — which the author rule above outranks, so
+   without this collapsing would quietly do nothing. */
+.card-body[hidden] { content-visibility: hidden; }
 
 .card-head {
   position: sticky;

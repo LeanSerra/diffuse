@@ -47,6 +47,10 @@ pub struct Invocation {
     /// Whether to launch a browser. Off for scripts and for driving diffuse
     /// from another tool, which then reads the URL from stderr.
     pub open_browser: bool,
+    /// Send the whole diff up front however large it is, so find-in-page can
+    /// reach every file. Past the built-in ceiling diffuse otherwise falls
+    /// back to loading files as you reach them.
+    pub inline_all: bool,
 }
 
 impl Invocation {
@@ -133,6 +137,7 @@ pub fn parse<I: IntoIterator<Item = String>>(argv: I) -> Parsed {
     let mut ignored = Vec::new();
     let mut want_untracked = true;
     let mut open_browser = true;
+    let mut inline_all = false;
     let mut past_separator = false;
     let mut skip_next = false;
 
@@ -161,6 +166,10 @@ pub fn parse<I: IntoIterator<Item = String>>(argv: I) -> Parsed {
             open_browser = false;
             continue;
         }
+        if arg == "--inline-all" {
+            inline_all = true;
+            continue;
+        }
 
         if arg.starts_with('-') {
             if SILENT.contains(&arg.as_str()) {
@@ -184,6 +193,7 @@ pub fn parse<I: IntoIterator<Item = String>>(argv: I) -> Parsed {
         ignored,
         want_untracked,
         open_browser,
+        inline_all,
     })
 }
 
@@ -206,6 +216,8 @@ Any diff-producing git command works by replacing `git` with `diffuse`:
 OPTIONS:
     --no-untracked    Do not synthesize diffs for untracked files
     --no-open         Print the URL instead of opening a browser
+    --inline-all      Send the whole diff up front however large, so the
+                      browser's own find reaches every file
     -h, --help        Show this help
     -V, --version     Show version
 

@@ -47,6 +47,22 @@ export interface FileDiff {
   truncated: boolean;
 }
 
+/** The stream's opening record: how many files follow, and whether any will. */
+export interface StreamBegin {
+  type: "begin";
+  files: number;
+  /** False when the diff is past the server's ceiling and nothing follows. */
+  inline: boolean;
+  lines: number;
+  cap: number;
+}
+
+export type StreamRecord =
+  | StreamBegin
+  | { type: "file"; diff: FileDiff }
+  | { type: "end" }
+  | { type: "error"; error: string };
+
 export interface Head {
   branch: string; sha: string; subject: string; detached: boolean;
 }

@@ -1,4 +1,6 @@
-import type { CommitPage, FileDiff, FileEntry, FileList, Session } from "./types";
+import type {
+  CommitPage, FileDiff, FileEntry, FileList, Session, StreamBegin, StreamRecord,
+} from "./types";
 
 /**
  * The token is handed to the page in its launch URL. It is moved into
@@ -62,6 +64,48 @@ export function getFile(entry: FileEntry, rev: string | null, force = false): Pr
   if (entry.untracked) params.untracked = "1";
   if (force) params.force = "1";
   return get<FileDiff>("/api/file", params);
+}
+
+/**
+ * The whole diff, one NDJSON record per file, consumed as it arrives.
+ *
+ * Everything has to be in the page for the browser's own find to reach a file
+ * you have not scrolled to, and it is streamed rather than fetched whole so
+ * cards fill in as records land instead of waiting on the slowest file.
+ *
+ * The server refuses very large diffs: `begin.inline` false means nothing more
+ * follows and the caller should fall back to loading files one at a time.
+ */
+export async function streamAll(
+  rev: string | null,
+  on: { begin: (b: StreamBegin) => void; file: (d: FileDiff) => void; done: () => void },
+  signal: AbortSignal,
+): Promise<void> {
+  const url = new URL("/api/all", location.origin);
+  if (rev) url.searchParams.set("rev", rev);
+  const res = await fetch(url, { headers: { "X-Diffuse-Token": token }, signal });
+  if (!res.ok || !res.body) throw new Error(await res.text());
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  // Records are newline-delimited, but a chunk can split one anywhere, so the
+  // tail of each chunk is carried forward rather than parsed.
+  let rest = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    rest += value;
+    let at: number;
+    while ((at = rest.indexOf("\n")) !== -1) {
+      const line = rest.slice(0, at);
+      rest = rest.slice(at + 1);
+      if (!line) continue;
+      const rec = JSON.parse(line) as StreamRecord;
+      if (rec.type === "begin") on.begin(rec);
+      else if (rec.type === "file") on.file(rec.diff);
+      else if (rec.type === "error") throw new Error(rec.error);
+    }
+  }
+  on.done();
 }
 
 /// Holding this stream open is what keeps the diffuse process alive; when the

@@ -286,16 +286,19 @@ export default function App() {
 
   const pick = useCallback(
     (next: string | null) => {
-      show(next, false);
+      // The graph pane stays as it was. Picking a commit is navigation, not a
+      // reason to close the list you picked it from — you almost always want
+      // to pick the next one straight after.
+      show(next, graph);
       // Each commit you open is a place you can come back from, so the
       // browser's Back button steps through them instead of leaving diffuse.
       history.pushState(
-        { rev: next, graph: true },
+        { rev: next, graph },
         "",
         next ? `?rev=${encodeURIComponent(next)}` : location.pathname,
       );
     },
-    [show],
+    [show, graph],
   );
 
   useEffect(() => {
@@ -319,6 +322,16 @@ export default function App() {
     [rev, walk, pick],
   );
 
+  /* Which pane is showing is part of where you are, so Back restores it. The
+     current entry is rewritten rather than pushed: toggling a pane is not a
+     place you should have to press Back to leave. */
+  const toggleGraph = useCallback(() => {
+    const next = !graph;
+    history.replaceState({ rev, graph: next }, "", location.href);
+    setGraph(next);
+    setSidebar(true);
+  }, [graph, rev]);
+
   const toggleSidebar = useCallback(() => {
     setSidebar((open) => {
       try {
@@ -340,8 +353,7 @@ export default function App() {
       if (e.key === "[") { step(-1); return; }
       if (e.key === "]") { step(1); return; }
       if (e.key === "g" && range) {
-        setGraph((v) => !v);
-        setSidebar(true);
+        toggleGraph();
         return;
       }
       if (e.key !== "j" && e.key !== "k") return;
@@ -354,7 +366,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, paths, jump, toggleSidebar, range, step]);
+  }, [current, paths, jump, toggleSidebar, range, step, toggleGraph]);
 
   const bar = (
     <Bar
@@ -368,7 +380,7 @@ export default function App() {
       walkLength={walk.length}
       onStep={step}
       onToggleSidebar={toggleSidebar}
-      onToggleGraph={() => { setGraph((g) => !g); setSidebar(true); }}
+      onToggleGraph={toggleGraph}
       onBack={() => pick(null)}
       onRefresh={() => setNonce((n) => n + 1)}
     />

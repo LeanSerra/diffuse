@@ -313,16 +313,16 @@ body {
    target while files load. */
 .main { grid-area: main; overflow-y: auto; }
 
-/* No gap between cards. A sticky header can only stay while its own card is on
-   screen, so any space between cards is a window where the previous header has
-   already been pushed off and the next has not yet reached the top — and the
-   diff shows through at the top edge. Flush cards hand off with no such window. */
-.stack { padding: 14px; display: flex; flex-direction: column; gap: 0; }
+/* Files are separated so the end of one is obvious while scrolling. The gap is
+   safe because a sticky header is pushed up by its own card's bottom edge, so
+   it covers the card right down to that edge; what appears at the top during
+   the hand-off is the ground behind the stack, never the previous file's diff
+   leaking above where a header should be. */
+.stack { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
 
 .card {
   border: 1px solid var(--rule);
-  border-bottom: 0;
-  border-radius: 0;
+  border-radius: 6px;
   background: var(--raised);
   /* `clip`, not `hidden`. Both round the corners, but `hidden` creates a
      scroll container, which would make the card the sticky header's scrollport
@@ -330,11 +330,6 @@ body {
      still pins *and* rows are clipped at the card's rounded corners instead of
      showing through the notch above the header. */
   overflow: clip;
-}
-.card:first-child { border-radius: 6px 6px 0 0; }
-.card:last-child {
-  border-bottom: 1px solid var(--rule);
-  border-radius: 0 0 6px 6px;
 }
 .card:target, .card[data-current="true"] { border-color: var(--rule-strong); }
 

@@ -4,16 +4,45 @@ const LANE = 14;
 const ROW = 38;
 
 /** One row's lines: what enters from above, what leaves below. */
-function Lanes({ node, width }: { node: GraphNode; width: number }) {
+function Lanes({
+  node, prev, width, last, pendingAbove,
+}: {
+  node: GraphNode;
+  /** The row above, so this one can meet the line it left hanging. */
+  prev: GraphNode | null;
+  width: number;
+  /** The oldest row, with nothing below it: its parents are not drawn. */
+  last: boolean;
+  /** The uncommitted row sits above, joined by a dashed line. */
+  pendingAbove: boolean;
+}) {
   const x = (lane: number) => lane * LANE + LANE / 2;
   const mid = ROW / 2;
   const incoming = node.edges.filter(([from, to]) => to === node.lane && from !== node.lane);
-  const outgoing = node.edges.filter(([from]) => from === node.lane);
+  // Nothing below the oldest row is drawn — not its parents, not whatever the
+  // lanes beside it are still waiting for — so on that row every line stops at
+  // the dot's own level rather than running off the bottom into nothing.
+  const outgoing = last ? [] : node.edges.filter(([from]) => from === node.lane);
+  // An edge arriving straight down this commit's own lane has the same lane at
+  // both ends, so it is in neither list above. Without drawing it here the row
+  // above ends at its own bottom edge and every dot floats unattached.
+  const joined = prev
+    ? prev.edges.some(([, to]) => to === node.lane) || prev.through.includes(node.lane)
+    : pendingAbove;
   return (
     <svg className="lanes" width={width * LANE} height={ROW} aria-hidden="true">
       {node.through.map((lane) => (
-        <line key={`t${lane}`} x1={x(lane)} y1={0} x2={x(lane)} y2={ROW} />
+        <line key={`t${lane}`} x1={x(lane)} y1={0} x2={x(lane)} y2={last ? mid : ROW} />
       ))}
+      {joined && (
+        <line
+          className={prev ? undefined : "pending-line"}
+          x1={x(node.lane)}
+          y1={0}
+          x2={x(node.lane)}
+          y2={mid}
+        />
+      )}
       {incoming.map(([from], i) => (
         <path key={`i${i}`} d={`M${x(from)},0 C${x(from)},${mid * 0.7} ${x(node.lane)},${mid * 0.4} ${x(node.lane)},${mid}`} />
       ))}
@@ -81,7 +110,13 @@ export function CommitGraph({
           onClick={() => onPick(c.sha)}
           title={`${c.short} · ${c.author} · ${c.date.slice(0, 10)}`}
         >
-          <Lanes node={page.graph[i]} width={width} />
+          <Lanes
+            node={page.graph[i]}
+            prev={i > 0 ? page.graph[i - 1] : null}
+            width={width}
+            last={i === page.commits.length - 1 && !page.hasMore}
+            pendingAbove={!!page.range?.uncommitted}
+          />
           <span className="commit-text">
             <span className="commit-sub">{c.subject}</span>
             <span className="commit-meta">

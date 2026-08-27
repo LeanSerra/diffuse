@@ -17,7 +17,7 @@ use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 use syntect::util::LinesWithEndings;
 
 /// Files past this many lines are left plain; they already sit behind a click.
-pub const MAX_LINES: usize = 5000;
+pub const MAX_LINES: usize = 50_000;
 
 pub use crate::model::Span;
 
@@ -115,6 +115,12 @@ fn classify(stack: &ScopeStack) -> Option<&'static str> {
 /// long, or looks binary.
 pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
     if text.is_empty() || text.len() > 4 * 1024 * 1024 || text.contains('\0') {
+        return None;
+    }
+    // Counted before parsing, not while. The ceiling is a refusal either way,
+    // but discovering it on the last line means having already paid for every
+    // line before it — seconds of work thrown away.
+    if text.bytes().filter(|b| *b == b'\n').count() > MAX_LINES {
         return None;
     }
     let set = syntaxes();

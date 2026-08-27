@@ -12,22 +12,34 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::{Body, Bytes};
 use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, StatusCode, Uri};
 use axum::response::sse::{Event, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
+use rayon::prelude::*;
 use serde::Deserialize;
-use tokio_stream::wrappers::IntervalStream;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
 use tokio_stream::StreamExt;
 
 use crate::git::Runner;
 use crate::model::FileDiff;
 use crate::{highlight, words};
 
-/// Files larger than this are not sent until the reader explicitly asks.
+/// Files larger than this are not sent until the reader explicitly asks. Only
+/// the per-file route applies it; the whole-diff stream exists precisely to
+/// put everything in the page, so it holds nothing back.
 const LINE_CEILING: usize = 5000;
+/// Above this many changed lines the whole diff is not sent up front, because
+/// the page would hold a DOM row per line. `--inline-all` overrides it.
+const INLINE_LINE_CAP: usize = 50_000;
+/// A ceiling on whole-file text highlighted for one stream. Highlighting needs
+/// entire files, so a one-line change in a huge file costs the whole file;
+/// past this budget the remaining files stream plain but still searchable.
+const HIGHLIGHT_LINE_BUDGET: usize = 400_000;
 /// How long the process lingers with no browser attached.
 const IDLE_GRACE: Duration = Duration::from_secs(30);
 
@@ -193,13 +205,15 @@ async fn file(State(app): State<App>, headers: HeaderMap, Query(q): Query<FileQu
                     f.hunks.clear();
                     continue;
                 }
-                words::annotate(&mut f.hunks);
                 if untracked {
                     // Nothing existed before, so the file itself is the new side.
                     let text = r.read_untracked(&f.path).ok();
-                    highlight::annotate(f, None, text.as_deref());
-                } else if let Some((old, new)) = r.full_text(&f.path, f.old_path.as_deref()) {
-                    highlight::annotate(f, Some(&old), Some(&new));
+                    dress(f, None, text.as_deref());
+                } else {
+                    match r.full_text(&f.path, f.old_path.as_deref()) {
+                        Some((old, new)) => dress(f, Some(&old), Some(&new)),
+                        None => dress(f, None, None),
+                    }
                 }
             }
             files
@@ -222,6 +236,140 @@ async fn file(State(app): State<App>, headers: HeaderMap, Query(q): Query<FileQu
         )
             .into_response(),
     }
+}
+
+/// Word-level diffing and syntax highlighting, the two passes that turn a
+/// parsed patch into what the client draws. Both routes go through here so a
+/// file looks the same however it was asked for; passing no text skips
+/// highlighting and leaves the rows plain.
+fn dress(f: &mut FileDiff, old: Option<&str>, new: Option<&str>) {
+    words::annotate(&mut f.hunks);
+    if old.is_some() || new.is_some() {
+        highlight::annotate(f, old, new);
+    }
+}
+
+/// The whole diff, one NDJSON record per file.
+///
+/// Sending everything up front is what lets the browser's own find reach a
+/// file you have not scrolled to yet. It is streamed rather than returned
+/// whole so the page fills in as records land instead of waiting on the
+/// slowest file.
+async fn all(State(app): State<App>, headers: HeaderMap, Query(q): Query<Auth>) -> Response {
+    if !authorized(&app, &headers, q.t.as_deref()) {
+        return unauthorized();
+    }
+    let r = runner_for(&app, q.rev.as_deref());
+    let (tx, rx) = mpsc::channel::<Result<Bytes, Infallible>>(8);
+    tokio::task::spawn_blocking(move || stream_all(&r, &tx));
+    Response::builder()
+        .header(header::CONTENT_TYPE, "application/x-ndjson")
+        // Records are only useful as they arrive; a proxy holding them back to
+        // buffer the whole body would defeat the point.
+        .header("x-content-type-options", "nosniff")
+        .body(Body::from_stream(ReceiverStream::new(rx)))
+        .unwrap()
+}
+
+fn stream_all(r: &Runner, tx: &mpsc::Sender<Result<Bytes, Infallible>>) {
+    let send = |v: serde_json::Value| -> bool {
+        let Ok(mut line) = serde_json::to_vec(&v) else {
+            return false;
+        };
+        line.push(b'\n');
+        tx.blocking_send(Ok(Bytes::from(line))).is_ok()
+    };
+
+    let entries = match r.file_list() {
+        Ok(e) => e,
+        Err(e) => {
+            send(serde_json::json!({ "type": "error", "error": e.to_string() }));
+            return;
+        }
+    };
+
+    // Decided from the stat output, before any real work: the cost we are
+    // guarding against is a DOM row per changed line, and numstat already
+    // counts those.
+    let lines: usize = entries
+        .iter()
+        .map(|f| (f.additions + f.deletions) as usize)
+        .sum();
+    let inline = r.inv.inline_all || lines <= INLINE_LINE_CAP;
+    if !send(serde_json::json!({
+        "type": "begin",
+        "files": entries.len(),
+        "inline": inline,
+        "lines": lines,
+        "cap": INLINE_LINE_CAP,
+    })) {
+        return;
+    }
+    if !inline {
+        return;
+    }
+
+    let mut files = match r.whole_patch() {
+        Ok(text) => crate::parse::parse_patch(&text),
+        Err(e) => {
+            send(serde_json::json!({ "type": "error", "error": e.to_string() }));
+            return;
+        }
+    };
+    // Untracked files appear in no git diff, so their patches are synthesized
+    // and appended. Their text comes off disk rather than out of `full`.
+    let untracked: std::collections::HashSet<&str> = entries
+        .iter()
+        .filter(|e| e.untracked)
+        .map(|e| e.path.as_str())
+        .collect();
+    for path in &untracked {
+        if let Ok(d) = r.untracked_diff(path) {
+            files.push(d);
+        }
+    }
+
+    let full = r.whole_full_text();
+
+    // Spend the highlighting budget in list order, so which files come out
+    // coloured does not change from run to run.
+    let mut left = HIGHLIGHT_LINE_BUDGET;
+    let plan: Vec<bool> = files
+        .iter()
+        .map(|f| {
+            let cost = match full.get(&f.path) {
+                Some((_, new)) => new.lines().count(),
+                // Not in the diff: an untracked file, whose whole body is new.
+                None => f.hunks.iter().map(|h| h.lines.len()).sum(),
+            };
+            if cost <= left {
+                left -= cost;
+                true
+            } else {
+                false
+            }
+        })
+        .collect();
+
+    // Highlighting one file knows nothing about any other, so this fans out
+    // across cores; records are sent as each finishes, in whatever order.
+    files.into_par_iter().zip(plan).for_each(|(mut f, colour)| {
+        if !colour {
+            dress(&mut f, None, None);
+        } else if untracked.contains(f.path.as_str()) {
+            // Nothing existed before, so the file itself is the new side.
+            let text = r.read_untracked(&f.path).ok();
+            dress(&mut f, None, text.as_deref());
+        } else {
+            match full.get(&f.path) {
+                Some((old, new)) => dress(&mut f, Some(old), Some(new)),
+                None => dress(&mut f, None, None),
+            }
+        }
+        send(serde_json::json!({ "type": "file", "diff": f }));
+    });
+
+    send(serde_json::json!({ "type": "end" }));
 }
 
 async fn commits(
@@ -323,6 +471,7 @@ pub async fn serve(runner: Runner, dev: bool) -> std::io::Result<Serving> {
         .route("/api/session", get(session))
         .route("/api/files", get(files))
         .route("/api/file", get(file))
+        .route("/api/all", get(all))
         .route("/api/commits", get(commits))
         .route("/api/events", get(events))
         .fallback(asset)

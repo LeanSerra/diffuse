@@ -50,6 +50,10 @@ struct Assets;
 #[derive(Clone)]
 pub struct App {
     runner: Arc<Runner>,
+    /// The commits a multi-commit `show` covers, in the order they were named.
+    /// Empty for every other command. Resolved once at startup because every
+    /// route needs it and it costs a `git` call.
+    pager: Arc<Vec<String>>,
     token: Arc<String>,
     clients: Arc<AtomicUsize>,
     ever_connected: Arc<AtomicUsize>,
@@ -103,9 +107,18 @@ struct CommitsQuery {
 
 /// `rev` selects what to diff: a commit sha, or `worktree` for uncommitted
 /// work. Absent means the command diffuse was launched with.
+///
+/// Except for a `show` naming several commits, which is read one commit at a
+/// time. Running it whole would stack each commit's version of a file as its
+/// own card under a single commit's header — several rows called the same
+/// thing, and no way to tell which commit any of them came from. Answering
+/// here rather than at each route means no view can ever serve the pile.
 fn runner_for(app: &App, rev: Option<&str>) -> std::sync::Arc<Runner> {
     match rev {
-        None => app.runner.clone(),
+        None => match app.pager.first() {
+            Some(first) => std::sync::Arc::new(app.runner.for_commit(first)),
+            None => app.runner.clone(),
+        },
         Some("worktree") => std::sync::Arc::new(app.runner.for_worktree()),
         Some(sha) => std::sync::Arc::new(app.runner.for_commit(sha)),
     }
@@ -126,9 +139,15 @@ async fn session(State(app): State<App>, headers: HeaderMap, Query(q): Query<Aut
         return unauthorized();
     }
     let r = runner_for(&app, q.rev.as_deref());
+    // The command as typed, not the single commit being shown, so the prompt
+    // keeps saying what you ran.
+    let command = app.runner.inv.display_command();
+    let paging = app.pager.len() > 1;
     let body = tokio::task::spawn_blocking(move || {
         serde_json::json!({
-            "command": r.inv.display_command(),
+            "command": command,
+            "showPager": paging,
+            "innerCommand": r.inv.display_command(),
             "root": r.repo.root,
             "name": r.repo.root.file_name().map(|s| s.to_string_lossy().into_owned()),
             "head": r.head(),
@@ -381,9 +400,26 @@ async fn commits(
         return unauthorized();
     }
     let r = app.runner.clone();
+    let pager = app.pager.clone();
     let skip = q.skip.unwrap_or(0);
     let limit = q.limit.unwrap_or(200).min(500);
     let body = tokio::task::spawn_blocking(move || {
+        // A multi-commit `show` has no range to decompose — the commits are
+        // the ones the user named, and their order is the one they typed.
+        if pager.len() > 1 {
+            let page = r.commits_by_sha(&pager);
+            let spec: Vec<(String, Vec<String>)> = page
+                .iter()
+                .map(|c| (c.sha.clone(), c.parents.clone()))
+                .collect();
+            let graph = crate::graph::lay_out(&spec);
+            return serde_json::json!({
+                "range": null,
+                "commits": page,
+                "graph": graph,
+                "hasMore": false,
+            });
+        }
         let Some(range) = r.range() else {
             return serde_json::json!({ "range": null, "commits": [], "graph": [] });
         };
@@ -460,8 +496,10 @@ pub async fn serve(runner: Runner, dev: bool) -> std::io::Result<Serving> {
     } else {
         random_token()
     };
+    let pager = runner.show_commits();
     let app = App {
         runner: Arc::new(runner),
+        pager: Arc::new(pager),
         token: Arc::new(token.clone()),
         clients: Arc::new(AtomicUsize::new(0)),
         ever_connected: Arc::new(AtomicUsize::new(0)),

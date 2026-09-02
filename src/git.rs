@@ -737,19 +737,58 @@ impl Runner {
 
     /// One page of the range, newest first.
     pub fn commits(&self, spec: &str, skip: usize, limit: usize) -> Vec<Commit> {
-        // One extra field separator per record keeps parsing unambiguous even
-        // when a subject contains anything at all.
-        let fmt = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%aI%x1f%s%x1f%D";
-        let args: Vec<String> = vec![
-            "log".into(),
+        self.log(&[
             "--topo-order".into(),
-            fmt.into(),
-            "-z".into(),
             format!("--skip={skip}"),
             format!("--max-count={limit}"),
             spec.into(),
-        ];
+        ])
+    }
+
+    /// The commits `git show` would print, in the order the user named them.
+    ///
+    /// `git show` accepts anything: several revisions, a range, a tag, even a
+    /// blob. Asking git which commits it would show is the only way to agree
+    /// with it on every form; a blob prints its own contents instead of a sha,
+    /// which is what the hex filter rejects.
+    pub fn show_commits(&self) -> Vec<String> {
+        if self.inv.subcommand != Subcommand::Show {
+            return Vec::new();
+        }
+        let mut args = vec!["show".into(), "--no-patch".into(), "--format=%H".into()];
+        args.extend(self.inv.args.iter().cloned());
         let Ok(out) = self.raw(&args) else {
+            return Vec::new();
+        };
+        if !out.status.success() {
+            return Vec::new();
+        }
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.len() == 40 && l.bytes().all(|b| b.is_ascii_hexdigit()))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// Exactly these commits, in exactly this order. `--no-walk=unsorted` is
+    /// what stops git from either following ancestry or re-sorting by date.
+    pub fn commits_by_sha(&self, shas: &[String]) -> Vec<Commit> {
+        if shas.is_empty() {
+            return Vec::new();
+        }
+        let mut args: Vec<String> = vec!["--no-walk=unsorted".into()];
+        args.extend(shas.iter().cloned());
+        self.log(&args)
+    }
+
+    fn log(&self, args: &[String]) -> Vec<Commit> {
+        // One extra field separator per record keeps parsing unambiguous even
+        // when a subject contains anything at all.
+        let fmt = "--format=%H%x1f%h%x1f%P%x1f%an%x1f%aI%x1f%s%x1f%D";
+        let mut all: Vec<String> = vec!["log".into(), fmt.into(), "-z".into()];
+        all.extend(args.iter().cloned());
+        let Ok(out) = self.raw(&all) else {
             return Vec::new();
         };
         if !out.status.success() {

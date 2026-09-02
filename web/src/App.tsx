@@ -142,14 +142,18 @@ export default function App() {
     return () => abort.abort();
   }, [nonce, rev]);
 
+  const paging = session?.showPager ?? false;
+  /** Whether there are commits to move between, from either kind of command. */
+  const stepping = range !== null || paging;
+
   useEffect(() => {
-    if (!range) return;
+    if (!stepping) return;
     let live = true;
     getCommits()
       .then((p) => live && setPage(p))
       .catch(() => {});
     return () => { live = false; };
-  }, [range, nonce]);
+  }, [stepping, nonce]);
 
   /**
    * What the older/newer buttons step through: the uncommitted entry, if there
@@ -160,6 +164,13 @@ export default function App() {
     const revs = page.commits.map((c) => c.sha);
     return page.range?.uncommitted ? ["worktree", ...revs] : revs;
   }, [page]);
+
+  /**
+   * Which commit is on screen. A multi-commit `show` opens on the first one
+   * without naming it in the URL, so a bare address still means "where this
+   * command starts" — the server resolves it the same way.
+   */
+  const at = rev ?? (paging ? (walk[0] ?? null) : null);
 
   const paths = useMemo(() => list?.files.map((f) => f.path) ?? [], [list]);
   order.current = paths;
@@ -358,12 +369,12 @@ export default function App() {
   /** Negative goes up the list (newer), positive goes down (older). */
   const step = useCallback(
     (delta: number) => {
-      const at = rev ? walk.indexOf(rev) : -1;
-      if (at === -1) return;
-      const next = walk[at + delta];
+      const from = at ? walk.indexOf(at) : -1;
+      if (from === -1) return;
+      const next = walk[from + delta];
       if (next) pick(next);
     },
-    [rev, walk, pick],
+    [at, walk, pick],
   );
 
   /* Which pane is showing is part of where you are, so Back restores it. The
@@ -396,7 +407,7 @@ export default function App() {
       if (e.key === "b") { toggleSidebar(); return; }
       if (e.key === "[") { step(-1); return; }
       if (e.key === "]") { step(1); return; }
-      if (e.key === "g" && range) {
+      if (e.key === "g" && stepping) {
         toggleGraph();
         return;
       }
@@ -410,7 +421,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, paths, jump, toggleSidebar, range, step, toggleGraph]);
+  }, [current, paths, jump, toggleSidebar, stepping, step, toggleGraph]);
 
   const bar = (
     <Bar
@@ -422,7 +433,8 @@ export default function App() {
       range={range}
       stream={stream}
       loaded={diffs.size}
-      walkAt={rev ? walk.indexOf(rev) : -1}
+      stepping={stepping}
+      walkAt={at ? walk.indexOf(at) : -1}
       walkLength={walk.length}
       onStep={step}
       onToggleSidebar={toggleSidebar}
@@ -464,7 +476,7 @@ export default function App() {
       {bar}
       {sidebar &&
         (graph ? (
-          <CommitGraph page={page} current={rev} onPick={pick} />
+          <CommitGraph page={page} current={at} onPick={pick} />
         ) : (
           <Sidebar files={files} current={current} onPick={jump} />
         ))}
@@ -539,7 +551,7 @@ function PanelIcon({ open }: { open: boolean }) {
 }
 
 function Bar({
-  session, list, sidebar, graph, rev, range, walkAt, walkLength, stream, loaded, onStep, onToggleSidebar, onToggleGraph, onBack, onRefresh,
+  session, list, sidebar, graph, rev, range, stepping, walkAt, walkLength, stream, loaded, onStep, onToggleSidebar, onToggleGraph, onBack, onRefresh,
 }: {
   session: Session | null;
   list: FileList | null;
@@ -549,6 +561,7 @@ function Bar({
   graph: boolean;
   rev: string | null;
   range: CommitRange | null;
+  stepping: boolean;
   walkAt: number;
   walkLength: number;
   onStep: (delta: number) => void;
@@ -612,12 +625,16 @@ function Bar({
           </button>
         </span>
       )}
-      {range && (
+      {stepping && (
         <button
           className="refresh"
           onClick={onToggleGraph}
           aria-pressed={graph}
-          title="Show the commits this diff is made of (g)"
+          title={
+            range
+              ? "Show the commits this diff is made of (g)"
+              : "Show the commits this command names (g)"
+          }
         >
           commits
         </button>

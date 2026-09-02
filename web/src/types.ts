@@ -111,6 +111,8 @@ export interface Session {
   ignoredFlags: string[];
   subcommand: string;
   range: CommitRange | null;
+  /** A `show` naming several commits, read one at a time rather than piled up. */
+  showPager: boolean;
 }
 
 export interface FileList {

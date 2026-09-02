@@ -15,6 +15,19 @@
   --accent: #b26a00;
   --accent-soft: #fff3dc;
 
+  /* Commit-graph lanes. Red and green are absent by rule: those two belong to
+     the diff, and a red line in the graph would read as a deletion. Amber is
+     the page's "where you are" accent, so the gold slot is the one hue here
+     that comes near it — the current commit is still told apart by its row
+     border and background, not by hue alone.
+     Validated as a cycle (slot 5 sits next to slot 1 again) against this
+     panel: worst adjacent pair CVD deltaE 10.3, normal-vision 21.1. */
+  --lane-1: #1f6fd0;
+  --lane-2: #db2777;
+  --lane-3: #0891b2;
+  --lane-4: #8b5cf6;
+  --lane-5: #a16207;
+
   --add-bg: #e7f6ec;
   --add-word: #a8e3bd;
   --add-mark: #0f7a44;
@@ -55,6 +68,15 @@
 --raised: #1b1f28;
 --rule: #262b36;
 --rule-strong: #39404f;
+/* The same five hues stepped for the dark panel, not an automatic flip.
+   Worst adjacent pair CVD deltaE 7.5 — inside the warn band, which lanes earn
+   back with permanent secondary encoding: every lane is a fixed column, so two
+   of them are never in the same place. */
+--lane-1: #3b82d8;
+--lane-2: #d9548c;
+--lane-3: #1c9db5;
+--lane-4: #8b6ef0;
+--lane-5: #b8862f;
 --ink: #e6e9ef;
 --ink-mid: #9aa2b1;
 --ink-dim: #6c7484;
@@ -88,6 +110,15 @@
 --raised: #1b1f28;
 --rule: #262b36;
 --rule-strong: #39404f;
+/* The same five hues stepped for the dark panel, not an automatic flip.
+   Worst adjacent pair CVD deltaE 7.5 — inside the warn band, which lanes earn
+   back with permanent secondary encoding: every lane is a fixed column, so two
+   of them are never in the same place. */
+--lane-1: #3b82d8;
+--lane-2: #d9548c;
+--lane-3: #1c9db5;
+--lane-4: #8b6ef0;
+--lane-5: #b8862f;
 --ink: #e6e9ef;
 --ink-mid: #9aa2b1;
 --ink-dim: #6c7484;
@@ -641,7 +672,22 @@ body {
   stroke: var(--ink-dim);
   stroke-width: 2;
 }
-.commit-row[aria-current="true"] .lanes .dot { stroke: var(--accent); }
+/* Colour is keyed to the column, so a branch keeps the same hue for as long as
+   it occupies that lane, and two lines running side by side never match. The
+   cycle repeats every five columns, which only ever puts a repeat five lanes
+   apart — far enough that position tells them apart. */
+.lanes .lane-0 { stroke: var(--lane-1); }
+.lanes .lane-1 { stroke: var(--lane-2); }
+.lanes .lane-2 { stroke: var(--lane-3); }
+.lanes .lane-3 { stroke: var(--lane-4); }
+.lanes .lane-4 { stroke: var(--lane-5); }
+/* Heavier as well as amber. The gold lane is the one hue in the cycle that
+   comes near the accent, so where you are is marked by weight too rather than
+   by colour alone. */
+.commit-row[aria-current="true"] .lanes .dot {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
 
 /* Uncommitted work is marked out in amber, the colour used everywhere else for
    "where you are" rather than for anything in the diff itself. */

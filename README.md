@@ -42,7 +42,9 @@ diffuse show <commit>        # git show <commit>
 - **Word-level highlighting** — the characters that changed within a line, not just the line.
 - **Untracked files included.** `git diff` hides files you have not staged yet, which makes a new file invisible. diffuse synthesizes a patch for them whenever the right-hand side of the comparison is your working tree.
 - **Syntax highlighting** over 213 grammars, computed from the whole file so a hunk opening inside a block comment is still a comment.
+- **The browser's own find works across the whole diff.** Ctrl+F reaches files you have not scrolled to and files you have collapsed, because every file is in the page rather than loaded as you arrive at it.
 - **A commit graph for the range you asked for.** `diffuse diff master` renders the aggregate; press `g` to see the commits that produce it, with merge lanes, and click one to read it on its own. Once you are in a commit, `[` and `]` step to the newer or older one, and each commit you open is a history entry, so the browser's back button walks back through them.
+- **A `show` naming several commits is a pager, not a pile.** `diffuse show a b c` and `diffuse show a..b` open on the first commit and step through the rest, rather than stacking each commit's version of a file as its own unlabelled card.
 - **Rename-aware.** A rename is shown as a rename, not a delete plus an add.
 - **A file list that follows your scroll**, and a file header that stays pinned so a long diff never leaves you guessing.
 - **Read-only, by design.** No endpoint writes, so a bug can never cost you work.
@@ -81,6 +83,7 @@ forcing it would override anyone who set `diff.renames = false`.
 | --- | --- |
 | `--no-untracked` | Do not synthesize diffs for untracked files |
 | `--no-open` | Print the URL instead of launching a browser |
+| `--inline-all` | Load the whole diff however large, so find reaches every file |
 
 ## Security
 
@@ -112,7 +115,7 @@ blindly accepted.
 
 ## Known limits
 
-- Large diffs render without virtualization, so a few thousand files will be slow. Files over 5,000 changed lines wait behind a click.
+- Large diffs render without virtualization, so a few thousand files will be slow. Past 50,000 changed lines the whole diff is no longer loaded up front — find-in-page then reaches only the files you have visited, and the bar says so. `--inline-all` overrides it.
 - Combined diffs from merge commits render without old-side line numbers: each `-` belongs to a different parent, so a single number would be wrong.
 - Side-by-side view is not implemented.
 

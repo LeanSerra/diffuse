@@ -623,10 +623,13 @@ body {
   color: var(--ink);
 }
 
+/* Fixed width, but a width the component has already fitted to the sidebar —
+   lane spacing shrinks as lanes multiply, so this column can no longer grow
+   without bound and squeeze the commit subject out of the row. */
 .lanes {
   flex: 0 0 auto;
   display: block;
-  min-width: 14px;
+  min-width: 4px;
 }
 .lanes line, .lanes path {
   stroke: var(--rule-strong);

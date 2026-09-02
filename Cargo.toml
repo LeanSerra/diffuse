@@ -1,6 +1,6 @@
 [package]
 name = "diffuse"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A browser-based pager for git's diff output"
 license = "MIT"

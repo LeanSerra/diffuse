@@ -25,6 +25,14 @@ const TEXT_SHARE = 0.55;
 const CHROME = 22;
 const ROW = 38;
 
+/**
+ * The class carrying a lane's colour. Keyed to the column rather than to the
+ * branch, because a lane is the only identity the layout actually has — a
+ * branch has no name here once its ref is gone, and reusing a freed column is
+ * how the graph stays narrow.
+ */
+const hue = (col: number) => `lane-${col % 5}`;
+
 /** Lane spacing and dot size that fit `lanes` columns into the sidebar. */
 function scale(lanes: number, avail: number) {
   const floor = Math.min(TEXT_FLOOR, avail * TEXT_SHARE);
@@ -67,11 +75,15 @@ function Lanes({
   return (
     <svg className="lanes" width={width * LANE} height={ROW} aria-hidden="true">
       {node.through.map((col) => (
-        <line key={`t${col}`} x1={x(col)} y1={0} x2={x(col)} y2={last ? mid : ROW} />
+        <line
+          key={`t${col}`}
+          className={hue(col)}
+          x1={x(col)} y1={0} x2={x(col)} y2={last ? mid : ROW}
+        />
       ))}
       {joined && (
         <line
-          className={prev ? undefined : "pending-line"}
+          className={prev ? hue(node.lane) : "pending-line"}
           x1={x(node.lane)}
           y1={0}
           x2={x(node.lane)}
@@ -79,12 +91,12 @@ function Lanes({
         />
       )}
       {incoming.map(([from], i) => (
-        <path key={`i${i}`} d={`M${x(from)},0 C${x(from)},${mid * 0.7} ${x(node.lane)},${mid * 0.4} ${x(node.lane)},${mid}`} />
+        <path key={`i${i}`} className={hue(from)} d={`M${x(from)},0 C${x(from)},${mid * 0.7} ${x(node.lane)},${mid * 0.4} ${x(node.lane)},${mid}`} />
       ))}
       {outgoing.map(([, to], i) => (
-        <path key={`o${i}`} d={`M${x(node.lane)},${mid} C${x(node.lane)},${mid + mid * 0.4} ${x(to)},${mid + mid * 0.7} ${x(to)},${ROW}`} />
+        <path key={`o${i}`} className={hue(to)} d={`M${x(node.lane)},${mid} C${x(node.lane)},${mid + mid * 0.4} ${x(to)},${mid + mid * 0.7} ${x(to)},${ROW}`} />
       ))}
-      <circle className="dot" cx={x(node.lane)} cy={mid} r={dot} />
+      <circle className={`dot ${hue(node.lane)}`} cx={x(node.lane)} cy={mid} r={dot} />
     </svg>
   );
 }

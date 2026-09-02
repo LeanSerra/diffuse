@@ -15,16 +15,23 @@ function splitPath(path: string) {
 const ROW = 20;
 
 /**
- * Roughly how tall this file's diff will be once it arrives.
+ * How tall this file's diff is, or will be once it arrives.
  *
  * A fixed-size placeholder makes every unloaded file three rows tall, so the
  * document is far shorter than it will end up being and any scroll past a
- * pending file lands in the wrong place. Guessing from the line counts we
- * already have keeps the document close to its real length.
+ * pending file lands in the wrong place.
+ *
+ * Once the diff is here the row count is exact, so use it. Before that all we
+ * have is `git --numstat`, which counts only changed lines — the context lines
+ * around them are rendered too and are invisible to it, so that guess runs
+ * short by roughly the context width per hunk and the document is built too
+ * small until every file has landed.
  */
-function estimateHeight(entry: FileEntry) {
+function estimateHeight(entry: FileEntry, diff: FileDiff | null) {
   if (entry.binary) return 44;
-  const rows = Math.min(entry.additions + entry.deletions + 6, 5000);
+  const rows = diff
+    ? diff.hunks.reduce((n, h) => n + h.lines.length + 1, 0)
+    : Math.min(entry.additions + entry.deletions + 6, 5000);
   return rows * ROW + 8;
 }
 
@@ -245,11 +252,11 @@ export function FileCard({
         className="card-body"
         // Feeds `contain-intrinsic-size`, so a card the browser has not laid
         // out yet still takes up roughly the room it eventually will.
-        style={{ "--est": `${estimateHeight(entry)}px` } as CSSProperties}
+        style={{ "--est": `${estimateHeight(entry, shown)}px` } as CSSProperties}
       >
         {error && <p className="note">{error}</p>}
         {!error && !shown && (
-          <div className="skeleton" style={{ height: estimateHeight(entry) }} />
+          <div className="skeleton" style={{ height: estimateHeight(entry, null) }} />
         )}
         {!error && shown && <DiffBody diff={shown} onForce={force} />}
       </div>

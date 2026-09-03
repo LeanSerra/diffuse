@@ -29,10 +29,8 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             archive: tar.gz
-          # Intel macOS is cross-compiled from an ARM runner: the macos-13
-          # image is retired, and every current macOS runner is ARM. Apple's
-          # toolchain carries both SDKs, and this job only builds the binary,
-          # never runs it.
+          # Cross-compiled from ARM: the macos-13 image is retired and every
+          # current macOS runner is ARM.
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
@@ -45,9 +43,8 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      # Pinned here because this repo's package.json lives in web/, and the
-      # action only reads `packageManager` from the repository root.
-      # Keep in step with web/package.json.
+      # The action reads `packageManager` only from the repo root, and this
+      # repo's package.json is in web/. Keep in step with it.
       - uses: pnpm/action-setup@v6
         with:
           version: 11.3.0
@@ -76,8 +73,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          # On a tag push this is the tag; on a manual run GITHUB_REF_NAME would
-          # be the branch, which would name the archives "diffuse-main-...".
+          # GITHUB_REF_NAME would be the branch on a manual run.
           tag="${{ inputs.tag || github.ref_name }}"
           version="${tag#v}"
           name="diffuse-${version}-${{ matrix.target }}"
@@ -94,7 +90,6 @@ jobs:
           else
             tar czf "$name.tar.gz" "$name"
           fi
-          # Checksums travel with the archive so a download can be verified.
           openssl dgst -sha256 -r "$name.${{ matrix.archive }}" > "$name.${{ matrix.archive }}.sha256"
 
       - uses: actions/upload-artifact@v7
@@ -109,15 +104,44 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
       - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
+
+      - name: Find the previous tag
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          # By ancestry, not tag date — and empty on the first release.
+          prev=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+          echo "PREVIOUS_TAG=$prev" >> "$GITHUB_ENV"
+          echo "previous tag: ${prev:-<none>}"
+
+      # Preferred over GitHub's own generate_release_notes for the shape of the
+      # output: entries grouped by type and each one linked to its commit.
+      - name: Build the changelog
+        id: changelog
+        uses: requarks/changelog-action@v1.10.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fromTag: ${{ inputs.tag || github.ref_name }}
+          toTag: ${{ env.PREVIOUS_TAG }}
+          writeToFile: false
+
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
+          name: "diffuse: ${{ inputs.tag || github.ref_name }}"
           draft: true
-          generate_release_notes: true
+          body: |
+            Read the [docs](https://github.com/${{ github.repository }}/blob/${{ inputs.tag || github.ref_name }}/README.md) before running.
+
+            ${{ steps.changelog.outputs.changes }}
           files: |
             dist/*.tar.gz
             dist/*.zip

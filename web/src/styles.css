@@ -401,7 +401,13 @@ body {
 /* `hidden="until-found"` collapses a card by setting `content-visibility:
    hidden` from the UA stylesheet — which the author rule above outranks, so
    without this collapsing would quietly do nothing. */
-.card-body[hidden] { content-visibility: hidden; }
+.card-body[hidden] {
+  content-visibility: hidden;
+  /* And no reserved height: `contain-intrinsic-size` above is what a skipped
+     card stands in at, which for a collapsed one would hold the card open at
+     full height and make collapsing do nothing at all. */
+  contain-intrinsic-size: 0;
+}
 
 .card-head {
   position: sticky;
